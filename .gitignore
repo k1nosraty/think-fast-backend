@@ -3,6 +3,14 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# amir ignor:
+.venv/
+__pycache__/
+*.py[cod]
+.env
+db.sqlite3
+.idea
+
 # C extensions
 *.so
 
