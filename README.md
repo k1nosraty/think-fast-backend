@@ -1,91 +1,77 @@
 # Think Fast Backend
 
-Backend for **Think Fast**, a real-time deduction game for solo, head-to-head,
-and multiplayer matches. Players race to discover a secret number or color
-sequence under one of several rule sets.
+Authoritative backend for **Think Fast**, a fast competitive deduction game.
+Players solve number, color, and later word challenges in solo or realtime
+matches. The server owns rules, secrets, timing, accepted attempts, feedback,
+and results.
 
-This repository is currently in the **architecture and product-definition
-phase**. The Django scaffold exists, but gameplay code has intentionally not
-been implemented yet.
+The repository is currently documentation-ready and implementation has not
+started. Work must follow the roadmap and execution prompts rather than adding
+features ad hoc.
 
-## Product at a glance
+## MVP
 
-Think Fast has one shared match lifecycle and three initial game modes:
+The implementation baseline is deliberately narrow:
 
-1. **Number Code** — guess a 5- or 6-digit secret; feedback is exact position,
-   present in another position, or absent.
-2. **Hidden Color Code** — guess an ordered color sequence; feedback uses
-   configurable symbols such as `+`, `-`, and `0`.
-3. **Color Permutation** — reorder a known (or optionally hidden) set of colors;
-   feedback reveals only the number of positions that are correct.
+- responsive web/PWA client (maintained by the frontend team);
+- guest-first identity with an account upgrade path;
+- Number game as the first complete vertical slice;
+- solo practice and private friendly 1v1;
+- server-generated shared secrets for fair competition;
+- room, ready, countdown, realtime progress, reconnect, result, and rematch;
+- REST commands/snapshots plus versioned WebSocket events.
 
-The authoritative specification is [docs/product/game-design.md](docs/product/game-design.md).
+Color variants follow after the 1v1 core is reliable. Player-authored duels and
+Word are explicit expansion work, not prerequisites for the first playable MVP.
+Ranked, teams, tournaments, chat, monetization, and microservices are later.
 
-## Planned architecture
+## Read this first
 
-The first release is a **modular Django monolith** with PostgreSQL, Redis,
-Django REST Framework, and Django Channels. HTTP handles durable resources and
-commands; WebSockets deliver live match events. Game-rule engines remain pure
-Python and independent from transport and persistence.
+Humans can understand the project with this short path:
 
-See:
+1. [Product and game rules](docs/product/game-design.md)
+2. [Architecture and domain model](docs/architecture/overview.md)
+3. [Frontend/backend contracts](docs/api/realtime-contract.md)
+4. [Roadmap](ROADMAP.md)
+5. [Backend AI execution tasks](docs/execution/BACKEND-TASKS.md)
 
-- [Architecture overview](docs/architecture/overview.md)
-- [Domain model](docs/architecture/domain-model.md)
-- [API and realtime contract](docs/api/realtime-contract.md)
-- [Roadmap](ROADMAP.md)
-- [Engineering decisions](docs/decisions/README.md)
+Role-specific handoff:
 
-## Repository layout
+- [Backend guide](docs/backend/README.md)
+- [Quality strategy](docs/quality/README.md)
+- [Documentation map and source-of-truth rules](docs/README.md)
+
+AI agents must read [AGENTS.md](AGENTS.md) before acting. More-specific
+`AGENTS.md` files apply under `apps/`, `docs/`, and `tests/`.
+
+## Planned structure
 
 ```text
-apps/                 Planned bounded Django applications
-config/               Django project configuration (temporary single settings file)
-docs/
-  api/                HTTP and WebSocket contracts
-  architecture/       System and domain design
-  decisions/          Architecture decision records (ADRs)
-  product/            Product rules and gameplay specification
-infra/                Future local/deployment infrastructure assets
-scripts/              Future developer and operational scripts
-tests/                Cross-application and end-to-end tests
-manage.py             Django entry point
-requirements.txt      Temporary dependency list until tooling is finalized
+apps/                 Django bounded applications (created in Task T1)
+config/               Django project and environment settings
+docs/                  Product, architecture, contracts, handoff, and execution
+infra/                 Local/deployment infrastructure
+scripts/               Repeatable developer and operational helpers
+tests/                 Cross-boundary contract, integration, and E2E tests
 ```
 
-Each planned application has a local README defining its ownership boundary.
-No empty Django packages are registered yet; application scaffolding belongs to
-Roadmap Phase 1.
+## Architecture in one paragraph
 
-## Development status
+Start as a modular Django monolith. Pure game evaluators validate and score a
+secret/guess without importing Django. Application services authorize commands,
+manage transactions and lifecycle, call evaluators, persist results, and emit
+events. PostgreSQL is the source of truth; Redis supports realtime delivery and
+ephemeral coordination. WebSocket delivery never decides match state.
 
-- Product rules clarified: complete for planning
-- Architecture and boundaries: proposed and documented
-- Runtime implementation: not started
-- API schema, database schema, and realtime protocol: planned, not frozen
+## Current scaffold
 
-## Quick start (current scaffold only)
+The existing Django settings are development-only and contain scaffold values.
+Task T1 replaces them with environment-based settings, PostgreSQL/Redis,
+tooling, CI, and a reproducible local stack. Until T1 is complete, do not deploy
+the project.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py check
-python manage.py runserver
-```
+## Working rule
 
-The current settings are development-only. Do not deploy them. Environment
-configuration, PostgreSQL, Redis, split settings, and secret management are
-Roadmap Phase 1 deliverables.
-
-## Working agreements
-
-- The server is authoritative for secrets, scoring, deadlines, and match state.
-- Never expose a secret in API responses, WebSocket events, logs, or analytics.
-- A game mode owns evaluation rules; the match layer owns competition flow.
-- Prefer deterministic, pure rule functions with exhaustive tests.
-- Do not introduce microservices before measured scaling or ownership pressure.
-- Record architecture-impacting changes as ADRs.
-
-For contributor guidance, see [CONTRIBUTING.md](CONTRIBUTING.md) and
-[AGENTS.md](AGENTS.md).
+Every implementation task must end in a demonstrable backend capability, tests,
+updated contracts/docs, and a concise handoff. A task is not complete merely
+because code compiles.

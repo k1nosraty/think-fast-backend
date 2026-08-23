@@ -30,10 +30,10 @@ or read wall-clock time.
 ## Core interaction: submit guess
 
 1. Authenticate participant and validate command/idempotency key.
-2. Lock or atomically advance the participant round state.
+2. Lock or atomically advance the participant Challenge state.
 3. Confirm match is active and server deadline has not passed.
 4. Normalize the guess under the frozen rule configuration.
-5. Load the protected secret and call the mode evaluator.
+5. Load the protected Secret and call the registered Game Type evaluator.
 6. Persist attempt, feedback, sequence number, and any terminal result in one
    transaction.
 7. Commit an outbox event.
@@ -44,7 +44,7 @@ state.
 
 ## Consistency and concurrency
 
-- Unique `(participant_round, attempt_number)` and idempotency constraints stop
+- Unique `(participant_challenge, attempt_number)` and idempotency constraints stop
   duplicated attempts.
 - Use row locking or an equivalent compare-and-set strategy for concurrent
   guesses and completion.

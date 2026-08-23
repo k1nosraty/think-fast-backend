@@ -1,16 +1,23 @@
-# API and Realtime Contract Direction
+# Frontend–Backend Contract Baseline
 
-This document defines protocol principles and candidate resources. Exact paths
-and payload schemas are finalized with the first vertical slice.
+This document is the single source of truth for protocol principles, resources,
+events, errors, and recovery. T0 converts the baseline into machine-readable
+OpenAPI and event-schema artifacts with canonical fixtures.
 
-## Versioning
+## Global rules
 
-- HTTP prefix: `/api/v1/`
-- WebSocket endpoint: `/ws/v1/matches/{match_id}/`
-- Every event carries `type`, `version`, `match_id`, `sequence`, and `occurred_at`.
-- Public identifiers are UUIDs. Enum values are stable machine tokens.
+- HTTP base: `/api/v1/`; WebSocket: `/ws/v1/matches/{match_id}/`.
+- Public IDs are UUIDs; timestamps are ISO-8601 UTC.
+- Client sends intent, not authoritative state, rules, time, score, or attempt
+  number.
+- Commands have a stable command/idempotency identity where retries are valid.
+- Semantic tokens are stable and unlocalized.
+- Every representation is viewer-authorized; there is no "serialize whole
+  Match" shortcut.
+- Secrets and opponent-private Guess/Feedback are prohibited unless an explicit
+  reveal policy authorizes them after terminal state.
 
-## Candidate HTTP resources
+## Candidate HTTP surface
 
 ```text
 POST /api/v1/guest-sessions/
@@ -20,43 +27,164 @@ POST /api/v1/rooms/
 POST /api/v1/rooms/{room_id}/join/
 POST /api/v1/rooms/{room_id}/ready/
 POST /api/v1/rooms/{room_id}/start/
-GET  /api/v1/matches/{match_id}/
 POST /api/v1/matches/{match_id}/guesses/
+POST /api/v1/matches/{match_id}/leave/
+POST /api/v1/matches/{match_id}/rematch/
 GET  /api/v1/matches/{match_id}/snapshot/
 ```
 
-Guess submission includes an `Idempotency-Key` header or explicit command ID.
-The response contains semantic feedback visible to that participant and the
-latest match event sequence. It never contains the unrevealed secret.
+Exact paths may be refined in T0, but resource ownership and semantics must not
+change implicitly during implementation.
 
-## Candidate WebSocket events
+## Command outcome
 
-- `room.member_joined`
-- `room.member_left`
-- `room.readiness_changed`
-- `match.started`
-- `attempt.accepted` (private detail; public projection may contain only progress)
-- `participant.solved`
-- `match.completed`
-- `match.cancelled`
-- `system.resync_required`
+A successful Guess response contains:
 
-## Snapshot and reconnect
+- command ID and accepted Attempt ID/ordinal;
+- semantic private feedback;
+- solved state;
+- current public match state;
+- latest known event sequence.
 
-WebSockets are a notification stream, not the sole state store. On connect or a
-sequence gap, the client obtains an authorized snapshot containing current
-rules, public participant state, its own allowed attempt history, match status,
-deadline, and latest sequence.
+It never returns the unrevealed Secret or another participant's private data.
 
-## Error shape
+## Feedback tagged union
 
-Errors should use a stable machine code, human-readable message, optional field
-details, request correlation ID, and retryability metadata. Examples include
-`invalid_guess_length`, `symbol_not_allowed`, `match_not_active`,
-`deadline_elapsed`, and `idempotency_conflict`.
+Positional feedback:
 
-## Visibility
+```json
+{
+  "kind": "positional",
+  "positions": ["exact", "present", "absent"]
+}
+```
 
-Each representation is built for one viewer role. Private guesses and feedback
-must not leak through room broadcasts, opponent snapshots, admin lists, logs,
-or generic model serializers.
+Aggregate exact/present feedback:
+
+```json
+{
+  "kind": "aggregate",
+  "exact_count": 2,
+  "present_count": 1
+}
+```
+
+Permutation feedback:
+
+```json
+{
+  "kind": "exact_count",
+  "exact_count": 2
+}
+```
+
+Clients must switch on `kind`; fields from one variant are not silently reused
+for another.
+
+## Event envelope
+
+```json
+{
+  "type": "opponent.guessed",
+  "version": 1,
+  "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+  "sequence": 18,
+  "occurred_at": "2026-08-23T12:30:00Z",
+  "payload": {
+    "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+    "attempt_count": 4
+  }
+}
+```
+
+Candidate event types:
+
+| Event | Visibility | Purpose |
+| --- | --- | --- |
+| `room.player_joined` | room public | lobby membership |
+| `room.ready_changed` | room public | readiness |
+| `match.countdown_started` | match public | synchronized start |
+| `match.started` | match public | authoritative active state/deadline |
+| `guess.evaluated` | participant private | accepted Attempt and Feedback |
+| `opponent.guessed` | opponent public | pressure/progress without Guess |
+| `participant.solved` | match public | solve status, not private history |
+| `participant.disconnected` | match public | presence |
+| `participant.reconnected` | match public | presence |
+| `match.finished` | viewer-specific | result and authorized reveal |
+| `rematch.requested` | room public | rematch readiness |
+| `system.resync_required` | connection private | fetch snapshot after a gap |
+
+Persisted match sequence is monotonic. Delivery may be duplicated or delayed;
+clients ignore an already-applied sequence and fetch Snapshot on an unexplained
+gap. Event delivery is not the source of truth.
+
+## Snapshot contract
+
+An authorized snapshot contains:
+
+- match/room identity and current lifecycle state;
+- immutable RuleSet snapshot including schema/evaluator version;
+- server time, start time, and deadline;
+- current viewer identity and permissions;
+- viewer-visible participant/presence/progress state;
+- viewer's permitted Attempt history and private feedback;
+- terminal result and permitted reveal data;
+- latest event sequence;
+- `available_actions` for the viewer.
+
+It must never contain another player's Guess/Feedback or an unrevealed Secret.
+Initial load, page refresh, reconnect, and event-gap recovery all use Snapshot.
+
+## Error envelope
+
+```json
+{
+  "code": "duplicate_not_allowed",
+  "message": "Repeated symbols are not allowed.",
+  "field_errors": {"guess": ["duplicate_not_allowed"]},
+  "request_id": "8e59db52-8767-4324-91a1-4592f240cfe8",
+  "retryable": false
+}
+```
+
+Initial stable codes include:
+
+```text
+invalid_guess_length
+invalid_symbol
+duplicate_not_allowed
+repetition_limit_exceeded
+match_not_active
+deadline_elapsed
+attempt_limit_reached
+room_not_found
+room_full
+not_room_host
+not_ready
+idempotency_conflict
+rate_limited
+resync_required
+client_version_unsupported
+```
+
+Human messages may be localized by clients. Behavior is based on `code`, not
+message text.
+
+## Authentication and authorization
+
+- Guest creation returns a revocable identity credential suitable for the
+  selected frontend platform.
+- HTTP and WebSocket authenticate the same identity and enforce match membership.
+- Room codes locate rooms but are not authorization after join.
+- WebSocket subscription is denied before group membership when unauthorized.
+- One primary gameplay connection per participant/match is the working default;
+  T0 freezes replacement behavior.
+
+## Contract workflow
+
+1. Product behavior is decided in game design.
+2. Frontend and Backend freeze schema/examples before parallel implementation.
+3. Frontend develops against canonical fixtures/mock server.
+4. Backend validates responses/events against the same schemas.
+5. Shared contract/E2E tests gate integration.
+6. Breaking changes require explicit versioning and both leads' approval.

@@ -1,174 +1,270 @@
-# Game Design Specification
+# Think Fast Product and Game Rules
 
-## Product premise
+This is the product-behavior source of truth shared by Product, Frontend,
+Backend, QA, and AI agents. Technical schemas live in the contract document.
 
-Think Fast is a deduction race. A player repeatedly submits an ordered guess,
-receives limited feedback, and tries to solve the secret with fewer attempts or
-in less time than opponents. The same platform supports solo practice, direct
-duels, and small multiplayer rooms.
+## Product definition
 
-## Canonical terminology
+Think Fast is a realtime competitive deduction platform: players solve a
+system- or player-created challenge using limited feedback, under time and/or
+attempt pressure.
 
-- **Game mode:** evaluation rule family, such as Number Code.
-- **Rule configuration:** immutable parameters for one match (length, palette,
-  duplicate policy, history visibility, limits).
-- **Room:** lobby and access boundary for multiplayer participants.
-- **Match:** one competitive session under a frozen rule configuration.
-- **Round:** one secret-solving contest within a match.
-- **Secret:** authoritative ordered sequence being solved.
-- **Attempt:** one validated guess from one participant.
-- **Feedback:** mode-specific result of evaluating an attempt.
+Every feature should strengthen at least one pillar:
 
-## Shared match variants
+- **Fast:** short setup and short matches.
+- **Smart:** deduction beats random/spam guessing.
+- **Competitive:** opponent presence is felt without leaking private answers.
+- **Replayable:** rematch is the natural next action.
+- **Social:** private friendly play can later grow into party/team experiences.
 
-- **Solo practice:** one player versus a server-generated secret.
-- **Shared-secret race:** the server generates one secret for all players. This
-  is the recommended competitive default because difficulty is identical.
-- **Player-authored duel:** each player commits a valid secret for an opponent
-  before either secret is revealed. This should arrive after the core MVP.
-- **Multiplayer room:** 2–8 players by initial product policy; capacity is a rule
-  setting, not a hardcoded evaluator assumption.
+## Vocabulary
 
-## Shared configurable rules
+| Term | Meaning |
+| --- | --- |
+| Game Type | What is solved: `number`, `color`, later `word` |
+| Match Mode | How play is organized: `practice`, `friendly`, later `ranked` |
+| RuleSet | Validated machine-readable game and competition rules |
+| Preset | Localized UX name/description pointing to a RuleSet version |
+| Room | Reusable lobby/invite container that may host multiple matches |
+| Match | One competition with frozen participants, rules, timing, and result |
+| Challenge | One secret target assigned to one or more solvers |
+| Guess | Submitted candidate input; it may be rejected |
+| Attempt | Accepted, persisted, ordinal guess with feedback |
+| Snapshot | Authorized current state for initial load/recovery |
 
-- Sequence length and allowed symbols
-- Whether symbols may repeat
-- Maximum attempts and optional round deadline
-- History policy: `full`, `latest_only`, or `none`
-- Win policy: first correct guess, lowest attempts, fastest elapsed time, or a
-  configured composite
-- Feedback presentation mapping (semantic values remain stable)
-- Whether the secret/palette is server-generated or player-authored
+## Scope decisions
 
-Rule configuration is frozen when a match starts. A client may display rules,
-but cannot change them during play.
+### Social MVP (T0–T5)
 
-## Mode 1 — Number Code
+- Number game
+- Solo practice
+- Private friendly 1v1
+- Server-generated secret; 1v1 players solve the same challenge
+- Guest-first identity
+- Full lobby-to-rematch flow
+- Realtime opponent activity, result, refresh, disconnect, and reconnect
 
-### Default rules
+### Expansion (T6–T7)
 
-- Length: 5 or 6 digits; recommended competitive default is 6.
-- Alphabet: digits `0`–`9`.
-- Repetition: disabled by default.
-- Leading zero: disabled by default to avoid ambiguity between a number and a
-  fixed-width code. It may later be enabled explicitly, in which case values
-  are always strings.
+- Color Classic and Color Permutation
+- Player-authored symmetric friendly duel
+- Word feasibility prototype; implementation only after its gate passes
 
-### Feedback
+### Later
 
-Feedback is position-preserving: one semantic result is returned for each
-guessed digit.
+- Ranked, matchmaking, rating, leaderboard, progression
+- 3–8 player party/team, spectator, tournament
+- public room browser, chat, avatar upload, monetization
 
-- `exact` (green): digit exists at this position.
-- `present` (yellow): digit exists elsewhere.
-- `absent` (red): digit is not available elsewhere in the secret.
+## Shared match behavior
 
-If repeats are ever enabled, evaluation must use a two-pass consumption
-algorithm: mark exact matches first, then match remaining symbols by remaining
-frequency. This prevents over-reporting duplicate guesses.
+### Supported initial flows
 
-### Completion
-
-The attempt solves the round only when every position is `exact`.
-
-## Mode 2 — Hidden Color Code
-
-Players guess an ordered sequence drawn from a configured palette (for example,
-12 unique available colors). Sequence length and palette size are distinct.
-
-The rule engine returns semantic feedback, not UI glyphs:
-
-- `exact`
-- `present`
-- `absent`
-
-The initial presentation maps them to `+`, `-`, and `0`; clients may render
-equivalent accessible shapes/text. The API must never use color alone to convey
-meaning.
-
-Default repetition is disabled. If enabled later, the same two-pass frequency
-rule as Number Code applies.
-
-## Mode 3 — Color Permutation
-
-Players reorder a fixed set of unique colors to discover the target ordering.
-
-### Variants
-
-- **Known palette:** all colors in the target are shown at the start; players
-  submit permutations of exactly those colors. Recommended default.
-- **Hidden palette:** players know only sequence length and choose from a larger
-  configured palette. This is materially harder and should be a distinct rule
-  variant, not a UI-only switch.
-
-### Feedback
-
-Return only `exact_count`, the number of symbols in their correct positions.
-Do not reveal which positions are correct. Guess history defaults to `none` in
-this mode, though the match configuration may choose another policy.
-
-For the known-palette variant, every guess must be a permutation of the offered
-symbols: no missing, additional, or repeated colors.
-
-## Match lifecycle
+Solo skips lobby readiness and activates after creation/start. Friendly 1v1 uses:
 
 ```text
-draft -> lobby -> ready -> active -> completed
-                    |         |          ^
-                    v         v          |
-                 cancelled  abandoned ---
+waiting -> ready_check -> countdown -> active -> finishing -> finished
+    |           |                         |           |
+    +-------> cancelled              abandoned     voided
 ```
 
-- A solo match may skip `lobby` and `ready`.
-- Participant membership and rules freeze on transition to `active`.
-- The server records start/deadline timestamps and decides whether an attempt is
-  in time.
-- Terminal matches reject further guesses.
-- Reconnect returns an authorized state snapshot; events alone are not state.
+- Rule changes before start reset every Ready state.
+- Participants and the versioned RuleSet snapshot freeze before countdown.
+- Late join is rejected after countdown begins.
+- The server owns all timestamps and determines whether a command arrived in
+  time.
+- Active terminal transition rejects later guesses.
+- Multiplayer timer does not pause on disconnect.
+- Friendly disconnect has a working-default 30-second grace period, subject to
+  playtest in T4.
+- Room survives a completed match so participants can request a new Match.
 
-## Ranking and ties
+### History policy
 
-Recommended MVP race ranking:
+RuleSets support:
+
+```text
+full
+last_n(N)
+none
+```
+
+The backend stores accepted Attempts according to its retention policy; history
+policy controls what an authorized client may see during play.
+
+### Invalid, repeated, and retried guesses
+
+- Invalid format/rules: reject with a stable error; do not consume an Attempt.
+- Same valid guess submitted intentionally again: allowed and consumes another
+  Attempt; frontend warns before submission.
+- Same command retransmitted with the same idempotency identity: return the
+  original outcome; never create another Attempt.
+- Abuse/rate counters may advance even when a Guess is invalid.
+
+### Win and tie baseline
+
+Working-default deduction-first ordering for the Social MVP:
 
 1. Solved beats unsolved.
-2. Fewer valid attempts wins.
-3. Lower server-measured elapsed time breaks equal-attempt ties.
-4. Guesses committed within a small configured tie window with the same attempt
-   count are declared tied, avoiding network-latency theater.
+2. Fewer accepted Attempts wins.
+3. Lower server-measured solve time breaks equal-attempt ties.
+4. Equivalent finishes inside a configurable server tie window are a draw.
 
-Exact tie-window and timeout values remain product configuration and must be
-load-tested before launch.
+If neither player solves by deadline/attempt limit, the result is `unsolved`
+or draw; MVP does not invent a "closest guess" winner.
 
-## Validation and fairness
+Effective-time penalties and Final Guess are experiments, not MVP behavior.
 
-- Normalize and validate every guess against the frozen rule configuration.
-- Reject invalid guesses without consuming an attempt unless abuse policy says
-  otherwise.
-- Give an idempotency key to guess commands so retries cannot create attempts.
-- Use server time and transactional sequence numbers for ordering.
-- Generate secrets with a cryptographically secure random source.
-- Never send a secret before authorized post-round reveal.
-- A player-authored secret must be committed before play, stored protected, and
-  never visible to its solver.
+### Opponent visibility
+
+Visible during friendly play:
+
+- display name and predefined avatar;
+- connected/disconnected state;
+- accepted attempt count;
+- generic "opponent guessed" activity;
+- playing/solved state.
+
+Private during play:
+
+- actual Secret;
+- actual Guess;
+- position feedback and guess history.
+
+The reveal policy after a normal finish is part of the RuleSet. `voided` matches
+do not automatically reveal protected data.
+
+## Number game
+
+### Rule fields
+
+```text
+sequence_length
+allow_leading_zero
+allow_duplicates
+max_symbol_repetition
+feedback_policy
+history_policy
+match_deadline_seconds
+attempt_limit
+```
+
+Initial supported lengths are 4, 5, and 6. The Domain represents secrets and
+guesses as symbol sequences/strings, never integers.
+
+Duplicate policy is finalized in T0 after a small gameplay prototype. Working
+candidate presets:
+
+- **Classic:** unique digits for clear onboarding.
+- **Brain Burner:** duplicates allowed, maximum two occurrences per digit.
+
+Unrestricted repetition remains a custom/experimental rule until playtested.
+
+### Positional feedback
+
+The semantic result for every guessed position is:
+
+- `exact`: symbol exists at this position;
+- `present`: an unconsumed instance exists elsewhere;
+- `absent`: no unconsumed instance remains.
+
+Evaluation is duplicate-safe:
+
+1. mark and consume exact matches;
+2. count unmatched secret symbols;
+3. consume one remaining count for each present match;
+4. mark all other positions absent.
+
+Clients choose color/icon/text. Green/yellow/red are presentation defaults, not
+API values.
+
+The challenge solves only when every position is `exact`.
+
+### Required examples
+
+T0 must freeze an example matrix covering: all exact, all absent, mixed
+position, repeated Guess against unique Secret, repeated Secret, leading zero,
+invalid length, invalid character, repetition limit, and intentional duplicate
+Attempt. These examples become shared contract fixtures.
+
+## Color expansion
+
+Color is one Game Type with RuleSet variants, not multiple engines.
+
+Stable `color_id` is domain identity; Hex, localized label, pattern, shape, and
+theme values are presentation metadata.
+
+### Color Classic
+
+- choose an ordered sequence from a known palette;
+- configurable palette size and sequence length;
+- duplicate-safe exact/present/absent evaluation;
+- feedback may be positional or aggregate as an explicit policy.
+
+### Color Permutation
+
+- player receives a known unique symbol set;
+- every Guess must be a permutation of exactly that set;
+- feedback returns only `exact_count` and never correct positions;
+- default history is `last_n(1)`; `none` is a harder preset.
+
+"Hidden/Mystery Palette" is later. Do not call it "Blind" because that conflicts
+with accessibility terminology.
+
+Color is never the only cue: each palette entry must support a shape/icon/label
+and sufficient contrast.
+
+## Player-authored friendly duel expansion
+
+This is distinct from a shared-secret race:
+
+```text
+Player A creates Challenge for B
+Player B creates Challenge for A
+server validates and commits both
+both solve simultaneously after countdown
+```
+
+- A committed Secret is immutable and private from its solver.
+- Setup timeout cancels without win/loss.
+- Creator sees only the same public progress allowed to an opponent.
+- Results are Friendly-only and never rating-eligible because challenge
+  difficulty differs.
+- The Domain models separate Challenges; it must not assume one `Match.secret`.
+
+## Word gate
+
+Word is strategically interesting but not approved for MVP implementation.
+T7 must prototype and decide:
+
+- Persian normalization (`ی/ي`, `ک/ك`, spacing/half-space, diacritics);
+- dictionary/inflection/proper-name policy;
+- character-pool versus Wordle-like core loop;
+- feedback semantics;
+- profanity/harassment validation and appeal behavior;
+- latency, false-accept, and false-reject thresholds.
+
+AI moderation may assist later but cannot be the authoritative core validator.
 
 ## Accessibility and localization
 
-- Every color has a stable identifier and localized display label.
-- Feedback includes semantic text/shape; color is supplemental.
-- API values are locale-neutral; translation happens at presentation boundaries.
-- Support right-to-left clients without reversing the logical sequence indexes.
+- API tokens and sequence indexes are locale-neutral.
+- UI supports RTL and LTR without reversing logical sequence meaning.
+- Touch, keyboard, screen reader, reduced motion, optional sound/haptic, and
+  non-color cues are required client concerns.
+- Invalid/success feedback must not depend only on animation or audio.
 
-## MVP scope
+## Phase 0 decision gate
 
-The backend MVP proves Solo Number Code first, then private shared-secret rooms,
-then Modes 2 and 3. Public matchmaking, rankings, chat, tournaments, and economy
-features are deliberately excluded until core retention and fairness are known.
+T0 is complete only after Product, Frontend, and Backend record:
 
-## Product questions to validate before public launch
+1. Number preset lengths, leading-zero and duplicate/max-repetition rules.
+2. Positional feedback confirmation and canonical duplicate examples.
+3. Default timer, attempt limit, history, reveal, tie-window, and win policy.
+4. Guest permissions and authentication market choice.
+5. Exact Social MVP scope and Color/Word ordering.
+6. Frontend stack/browser support and accessibility baseline.
+7. Retention and initial capacity targets.
+8. Named Product Owner/tie-breaker for future unresolved decisions.
 
-- Target match duration and ideal maximum attempts per mode
-- Whether competitive ranking prioritizes attempts or time
-- Exact tie window and reconnect grace period
-- Default history policy per difficulty tier
-- Whether player-authored secrets are private-room-only
-- Age rating, display-name policy, retention period, and regional privacy needs
+Until these are signed off, recommendations above remain working defaults.

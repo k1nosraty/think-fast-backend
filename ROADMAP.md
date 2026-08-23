@@ -1,94 +1,65 @@
-# Think Fast Backend Roadmap
+# Think Fast Delivery Roadmap
 
-The roadmap is ordered to validate the game core early and postpone expensive
-multiplayer and operations work until a playable solo slice exists.
+The roadmap uses a small number of substantial vertical tasks. Each task has a
+copy-ready AI prompt and acceptance criteria in
+[`docs/execution/BACKEND-TASKS.md`](docs/execution/BACKEND-TASKS.md). This is the
+Backend roadmap; the React team receives a separate handoff package and task
+plan. Cross-team implementation starts only after the shared contract is frozen.
 
-## Phase 0 — Product and architecture baseline (complete)
+| Task | Milestone | Playable outcome |
+| --- | --- | --- |
+| T0 | Decision and contract freeze | MVP rules and v1 contract baseline approved |
+| T1 | Engineering foundation | Reproducible local/CI backend foundation |
+| T2 | Solo Number vertical slice | Guest completes a Number match end-to-end |
+| T3 | Private room and realtime 1v1 | Two guests play a shared-secret match |
+| T4 | Reliability and recovery | Retry, concurrency, timeout, refresh, and reconnect are safe |
+| T5 | Rematch and gameplay polish | Complete play-rematch loop ready for playtest |
+| T6 | Color expansion | Color Classic and Permutation use the shared match platform |
+| T7 | Challenge expansion | Player-authored duel plus a bounded Word feasibility spike |
+| T8 | Production beta | Secure, observable, load-tested staged release |
+| T9 | Competitive product | Ranked/matchmaking/progression only after MVP evidence |
 
-- Clarify the three initial modes and shared terminology.
-- Define match lifecycle, fairness rules, secret ownership, and tie semantics.
-- Establish modular-monolith boundaries and delivery order.
-- Document API/realtime direction and initial ADRs.
+## Release boundaries
 
-**Exit:** implementation can start without deciding the system shape ad hoc.
+### Foundation release — T0–T1
 
-## Phase 1 — Engineering foundation
+The team can develop against stable conventions, contracts, local dependencies,
+and CI. No gameplay promise is made yet.
 
-- Pin a supported Python/Django toolchain; verify the currently declared Django
-  version is available and appropriate before implementation.
-- Introduce `pyproject.toml`, locked dependencies, Ruff, mypy, pytest, coverage,
-  and pre-commit.
-- Split settings into base/local/test/production and move all secrets to the
-  environment.
-- Configure PostgreSQL and Redis; add Docker Compose for local dependencies.
-- Add CI for checks, tests, migrations, and dependency/security scanning.
-- Scaffold `accounts`, `games`, `matches`, and `realtime` Django apps with clear
-  import direction.
+### First playable — T2
 
-**Exit:** a new developer can boot the stack and CI passes on an empty domain.
+Number Solo proves rules, persistence, API, guest identity, feedback, result,
+and secret safety through one vertical slice.
 
-## Phase 2 — Solo Number Code vertical slice (MVP foundation)
+### Social MVP — T3–T5
 
-- Implement immutable rule configuration and secure secret generation.
-- Implement the pure Number Code evaluator, including duplicate-policy tests.
-- Model game definition, match, participant, round, attempt, and result.
-- Add guest identity/session support and authenticated-user upgrade path.
-- Add create/start/guess/state HTTP endpoints with idempotent guess submission.
-- Add per-user rate limits and secret-redaction tests.
-- Provide an OpenAPI schema and seed/demo command.
+Private friendly 1v1 is realtime, recoverable, and replayable. This is the first
+candidate for closed user playtesting.
 
-**Exit:** one player can complete a Number Code match end-to-end.
+### Game expansion — T6–T7
 
-## Phase 3 — Realtime rooms and multiplayer
+Color confirms that shared match architecture is genuinely reusable.
+Player-authored challenges arrive after fair system-secret competition. Word is
+implemented only if its validation/feedback spike passes explicit gates.
 
-- Add private rooms with join codes and explicit host permissions.
-- Add lobby ready/start flow, capacity limits, and reconnect snapshots.
-- Publish versioned WebSocket events through Channels/Redis.
-- Define authoritative server deadlines and abandonment behavior.
-- Resolve simultaneous finishes with deterministic ordering and tie windows.
-- Add transactional/concurrency tests for duplicate and near-simultaneous guesses.
+### Beta — T8
 
-**Exit:** 2–8 players can reliably play a server-generated shared-secret match.
+Operations, security, retention, monitoring, backup/restore, and capacity are
+validated before external release.
 
-## Phase 4 — Remaining rule modes
+### Post-MVP — T9
 
-- Add Hidden Color Code with palette/length validation and symbol feedback.
-- Add Color Permutation with known-palette and hidden-palette variants.
-- Add player-authored secrets with commit-before-play, validation, privacy, and
-  no-self-play rules.
-- Add history visibility policies: full history, latest only, or none.
-- Run contract tests against every mode through the shared evaluator protocol.
+Ranked, rating, leaderboard, public matchmaking, achievements, party/team,
+spectators, tournaments, chat, cosmetics, and monetization require product data
+and separate execution plans.
 
-**Exit:** all three modes work in solo and supported multiplayer configurations.
+## Phase exit rule
 
-## Phase 5 — Progression and social MVP
+A task closes only when:
 
-- Add match history, lightweight profiles, statistics, and achievements.
-- Add casual matchmaking only after private rooms are stable.
-- Add moderation/reporting hooks for player-authored content and display names.
-- Add optional practice difficulty presets and bots/hints without affecting
-  competitive scoring.
-
-**Exit:** the product supports repeat play and safe public discovery.
-
-## Phase 6 — Production hardening and launch
-
-- Add structured telemetry with secret-safe logging and audit events.
-- Add Sentry-compatible error reporting, health/readiness endpoints, metrics,
-  dashboards, alerts, backup/restore drills, and runbooks.
-- Load-test room fan-out, guess spikes, reconnect storms, and Redis failure.
-- Add retention/deletion policy, privacy endpoints, abuse controls, and security
-  review.
-- Roll out through staging and a limited beta with feature flags.
-
-**Exit:** SLOs, capacity envelope, recovery procedures, and launch checklist are
-validated.
-
-## Explicitly after MVP
-
-- Ranked queues, seasons, tournaments, spectators, chat, clans
-- User-generated public rule packs
-- In-game economy, purchases, advertising
-- Microservice extraction or multi-region active/active operation
-
-These require product evidence and separate architecture decisions.
+- its acceptance criteria pass;
+- frontend/backend contracts and canonical examples are current;
+- required tests pass in CI;
+- migrations and operational impact are documented;
+- the vertical outcome is demonstrated on the supported client path;
+- unresolved limitations are recorded rather than hidden.
