@@ -7,7 +7,6 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR_PATH = ROOT / "scripts" / "validate_contracts.py"
 SPEC = importlib.util.spec_from_file_location("validate_contracts", VALIDATOR_PATH)
@@ -95,7 +94,9 @@ class ContractTest(unittest.TestCase):
         schema_path = ROOT / "contracts/schemas/error.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
         fixture = json.loads(
-            (ROOT / "contracts/fixtures/errors/repetition-limit-exceeded.json").read_text(encoding="utf-8")
+            (ROOT / "contracts/fixtures/errors/repetition-limit-exceeded.json").read_text(
+                encoding="utf-8"
+            )
         )
         broken = copy.deepcopy(fixture)
         broken.pop("request_id")

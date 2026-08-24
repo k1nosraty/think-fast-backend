@@ -1,0 +1,66 @@
+[project]
+name = "think-fast-backend"
+version = "0.1.0"
+description = "Authoritative backend for the Think Fast game"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "channels[daphne]==4.3.2",
+  "channels-redis==4.3.0",
+  "django==5.2.17",
+  "djangorestframework==3.18.0",
+  "psycopg[binary]>=3.2.10,<4",
+]
+
+[dependency-groups]
+dev = [
+  "django-stubs[compatible-mypy]>=5.2.7,<6",
+  "mypy>=1.18.2,<2",
+  "pre-commit>=4.3.0,<5",
+  "pytest>=8.4.2,<9",
+  "pytest-cov>=7.0.0,<8",
+  "pytest-django>=4.11.1,<5",
+  "ruff>=0.13.2,<1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+strict = true
+exclude = ["migrations"]
+
+[[tool.mypy.overrides]]
+module = ["channels.*", "channels_redis.*"]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["tests", "apps"]
+addopts = "--strict-config --strict-markers --cov=apps --cov=config --cov-report=term-missing --cov-fail-under=85"
+
+[tool.coverage.run]
+branch = true
+omit = [
+  "*/migrations/*",
+  "manage.py",
+  "config/asgi.py",
+  "config/wsgi.py",
+  "config/settings/*",
+  "apps/realtime/routing.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

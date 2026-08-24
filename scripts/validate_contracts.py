@@ -16,7 +16,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
 
@@ -132,7 +131,9 @@ def validate(
     if expected_types is not None:
         names = [expected_types] if isinstance(expected_types, str) else expected_types
         if not any(_matches_type(instance, name) for name in names):
-            raise ContractValidationError(f"{where}: expected type {names}, got {type(instance).__name__}")
+            raise ContractValidationError(
+                f"{where}: expected type {names}, got {type(instance).__name__}"
+            )
 
     if isinstance(instance, str):
         if len(instance) < schema.get("minLength", 0):
@@ -176,7 +177,9 @@ def validate(
             elif schema.get("additionalProperties") is False:
                 raise ContractValidationError(f"{child_where}: additional property is forbidden")
             elif isinstance(schema.get("additionalProperties"), dict):
-                validate(value, schema["additionalProperties"], schema_path, root_schema, child_where)
+                validate(
+                    value, schema["additionalProperties"], schema_path, root_schema, child_where
+                )
 
 
 def _walk_refs(value: Any, path: Path, root: Any) -> None:
@@ -198,10 +201,16 @@ def validate_openapi(path: Path) -> None:
     if document.get("info", {}).get("version") != "v1.0.0-draft.1":
         raise ContractValidationError("openapi.json: contract version mismatch")
     required_paths = {
-        "/guest-sessions/", "/game-definitions/", "/solo-matches/", "/rooms/",
-        "/rooms/{room_id}/join/", "/rooms/{room_id}/ready/",
-        "/rooms/{room_id}/start/", "/matches/{match_id}/guesses/",
-        "/matches/{match_id}/snapshot/", "/matches/{match_id}/leave/",
+        "/guest-sessions/",
+        "/game-definitions/",
+        "/solo-matches/",
+        "/rooms/",
+        "/rooms/{room_id}/join/",
+        "/rooms/{room_id}/ready/",
+        "/rooms/{room_id}/start/",
+        "/matches/{match_id}/guesses/",
+        "/matches/{match_id}/snapshot/",
+        "/matches/{match_id}/leave/",
         "/matches/{match_id}/rematch/",
     }
     missing = required_paths - set(document.get("paths", {}))
@@ -212,7 +221,9 @@ def validate_openapi(path: Path) -> None:
         for method, operation in path_item.items():
             if method in {"get", "post", "put", "patch", "delete"}:
                 if "operationId" not in operation or "responses" not in operation:
-                    raise ContractValidationError("openapi.json: operation lacks operationId/responses")
+                    raise ContractValidationError(
+                        "openapi.json: operation lacks operationId/responses"
+                    )
                 operation_ids.append(operation["operationId"])
     if len(operation_ids) != len(set(operation_ids)):
         raise ContractValidationError("openapi.json: duplicate operationId")

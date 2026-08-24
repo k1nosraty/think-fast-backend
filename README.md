@@ -5,10 +5,9 @@ Players solve number, color, and later word challenges in solo or realtime
 matches. The server owns rules, secrets, timing, accepted attempts, feedback,
 and results.
 
-Backend Task T0 is complete: MVP decisions, OpenAPI, JSON Schemas, canonical
-fixtures, and dependency-free contract tests are frozen at
-`v1.0.0-draft.1`. Gameplay implementation has not started. The next task is T1;
-do not skip directly to T2.
+Backend Tasks T0 and T1 are complete. MVP contracts are frozen at
+`v1.0.0-draft.1`; the reproducible Django engineering foundation is ready.
+Gameplay implementation has not started. The next task is T2.
 
 ## MVP
 
@@ -65,80 +64,49 @@ manage transactions and lifecycle, call evaluators, persist results, and emit
 events. PostgreSQL is the source of truth; Redis supports realtime delivery and
 ephemeral coordination. WebSocket delivery never decides match state.
 
-## Build, validate, and run the current scaffold
+## Build, validate, and run
 
 ### Requirements
 
-- Python with `venv` and `pip`
-- No PostgreSQL or Redis is required in T0
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/) 0.11.33 or compatible
+- Docker with Compose for local PostgreSQL 17.6 and Redis 7.4.5
 
-The repository currently retains the original scaffold dependency file. T1
-must verify/pin the supported Python/Django toolchain and replace this temporary
-workflow; do not treat it as the final production build.
-
-### Create the local environment
-
-Linux/macOS:
+### Bootstrap a clean machine
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+cp .env.example .env
+docker compose up -d
+uv sync --locked --dev
+uv run python manage.py migrate
 ```
 
-Windows PowerShell:
+`manage.py` selects `config.settings.local`. Environment variables from `.env`
+are not loaded implicitly; export/source them in your shell or use your process
+manager. The checked-in local defaults match Compose and contain no deployable
+secret. Start with `uv run python manage.py runserver`.
 
-```powershell
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-### Validate T0 contracts and tests
-
-These checks use only Python's standard library and can run before installing
-Django:
+### Run every quality gate
 
 ```bash
-python scripts/validate_contracts.py
-python -m unittest discover -s tests/contracts -p "test_*.py" -v
+uv run python scripts/check.py
 ```
 
-Expected T0 result:
+This runs formatting, lint, strict type checking, Django checks, migration drift,
+contract validation, pytest and the 85% coverage threshold.
 
-```text
-Contract validation passed: 1 OpenAPI document, 7 canonical fixtures
-Ran 6 tests
-OK
-```
-
-### Check and run the Django scaffold
-
-After installing `requirements.txt`:
+### Build the production image
 
 ```bash
-python manage.py check
-python manage.py migrate
-python manage.py runserver
+docker build --tag think-fast-backend:t1 .
 ```
 
-This starts only the original Django scaffold; no gameplay endpoint exists yet.
+The image starts Daphne with `config.settings.production`. It refuses to boot
+unless `DJANGO_SECRET_KEY` is strong and `DJANGO_ALLOWED_HOSTS`,
+`POSTGRES_PASSWORD`, and `REDIS_URL` are explicit. Run migrations as a separate
+release step before application replicas.
 
-### Production build status
-
-There is intentionally no supported production image/build in T0. Task T1 owns
-the pinned dependency lock, split settings, PostgreSQL/Redis local stack, CI,
-container/build procedure, production checks, and reproducible deployment
-artifact. Deploying the current development settings is unsupported.
-
-## Current scaffold and contract assets
-
-The existing Django settings are development-only and contain scaffold values.
-Task T1 replaces them with environment-based settings, PostgreSQL/Redis,
-tooling, CI, and a reproducible local stack. Until T1 is complete, do not deploy
-the project.
+## Foundation and contract assets
 
 ```text
 contracts/openapi.json                 OpenAPI 3.1 baseline
@@ -147,6 +115,10 @@ contracts/fixtures/                    Canonical cross-team examples
 contracts/manifest.json                Validation manifest/version
 scripts/validate_contracts.py          Dependency-free validator
 tests/contracts/test_contracts.py      Contract and semantic example tests
+config/settings/                       Explicit local/test/production settings
+compose.yaml                           Local PostgreSQL and Redis
+Dockerfile                             Reproducible production ASGI image
+scripts/check.py                       Local/CI quality-gate entrypoint
 ```
 
 ## Working rule

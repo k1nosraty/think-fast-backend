@@ -10,17 +10,17 @@ the assigned AI task. Root and `apps/AGENTS.md` are binding.
 
 ## Target stack
 
-T1 must select and pin a supported Python/Django baseline. Planned components:
+T1 selected and locked this supported baseline:
 
-- Django + Django REST Framework
-- ASGI + Django Channels
-- PostgreSQL source of truth
-- Redis channel layer/ephemeral coordination
+- Python 3.12, Django 5.2 LTS and Django REST Framework 3.18
+- ASGI + Django Channels 4.3
+- PostgreSQL 17 source of truth
+- Redis 7.4 channel layer/ephemeral coordination
 - pytest/pytest-django, Ruff, mypy, coverage, pre-commit
 - OpenAPI plus versioned JSON event schemas
 
-Do not assume the scaffold's dependency versions are approved until T1 verifies
-them against official compatibility and records the choice.
+`pyproject.toml`, `uv.lock` and ADR 0005 are canonical for exact versions and
+upgrade policy.
 
 ## Module ownership
 

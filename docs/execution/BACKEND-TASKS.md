@@ -36,6 +36,9 @@ example validates; no endpoint, model, evaluator, or consumer implemented.
 
 **Effort:** High.
 
+**Status:** Complete on 2026-08-24. The next implementation task is T2; do not
+reinterpret or expand this foundation implicitly.
+
 - Verify and pin supported Python/Django/DRF/Channels/PostgreSQL/Redis versions.
 - Replace scaffold dependencies with the selected `pyproject.toml`/lock flow.
 - Configure Ruff, mypy, pytest, coverage, pre-commit and CI.

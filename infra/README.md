@@ -2,6 +2,9 @@
 
 Reserved for reviewed local and deployment infrastructure assets.
 
-Phase 1 is expected to add local PostgreSQL/Redis orchestration, container build
-files, environment templates, and health checks. Provider-specific production
-configuration should live in explicit subdirectories and contain no secrets.
+T1 provides `compose.yaml` for pinned PostgreSQL/Redis dependencies,
+`.env.example`, operational probes and a non-root ASGI `Dockerfile`. Start local
+dependencies with `docker compose up -d`; do not commit `.env`.
+
+Provider-specific production configuration remains future work and must live in
+explicit subdirectories without secrets.

@@ -1,16 +1,22 @@
-"""
-ASGI config for config project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/6.1/howto/deployment/asgi/
-"""
+"""ASGI entrypoint for HTTP and the empty T1 WebSocket boundary."""
 
 import os
 
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
+
+from channels.auth import AuthMiddlewareStack
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+from apps.realtime.routing import websocket_urlpatterns
 
-application = get_asgi_application()
+django_asgi_application = get_asgi_application()
+application = ProtocolTypeRouter(
+    {
+        "http": django_asgi_application,
+        "websocket": AllowedHostsOriginValidator(
+            AuthMiddlewareStack(URLRouter(websocket_urlpatterns))
+        ),
+    }
+)
