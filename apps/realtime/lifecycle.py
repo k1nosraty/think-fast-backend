@@ -5,7 +5,8 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.matches.models import Match, Participant, Result
+from apps.analytics.service import record_analytics
+from apps.matches.models import Match, Participant, Result, Room, RoomMembership
 from apps.realtime.publisher import record_event
 
 
@@ -39,6 +40,12 @@ def claim_connection(
             visibility="match",
             participant=participant,
             payload={"participant_id": str(participant.id)},
+        )
+        record_analytics(
+            "participant_reconnected",
+            match_id=participant.match_id,
+            room_id=participant.match.room_id,
+            preset_id=str(participant.match.rules["preset_id"]),
         )
     return replaced_channel
 
@@ -98,6 +105,11 @@ def expire_disconnect_grace(
     match.state = Match.State.ABANDONED
     match.finished_at = now
     match.save(update_fields=["state", "finished_at"])
+    if match.room_id:
+        room = Room.objects.select_for_update().get(pk=match.room_id)
+        room.state = Room.State.READY_CHECK
+        room.save(update_fields=["state", "updated_at"])
+        RoomMembership.objects.filter(room=room).update(ready=False)
     other_ids = [
         str(item)
         for item in match.participants.exclude(pk=participant.pk).values_list("id", flat=True)
@@ -119,5 +131,21 @@ def expire_disconnect_grace(
             "reason": "abandoned",
             "secret_revealed": False,
         },
+    )
+    record_analytics(
+        "participant_abandoned",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        reason="abandoned",
+    )
+    record_analytics(
+        "match_completed",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        outcome="abandoned",
+        reason="abandoned",
+        solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
     )
     return True

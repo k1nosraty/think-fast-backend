@@ -1,6 +1,7 @@
 from django.utils import timezone
 
-from apps.matches.models import Match, Participant
+from apps.matches.models import Match, Participant, RematchProposal
+from apps.matches.rematches import expire_rematch_proposal
 from apps.matches.services import activate_countdown, refresh_match_state
 from apps.realtime.lifecycle import expire_disconnect_grace
 from apps.realtime.publisher import publish_pending
@@ -39,11 +40,18 @@ def sweep_reliability(*, limit: int = 100) -> dict[str, int]:
         for item, connection_id in grace_rows
         if connection_id is not None
     )
+    rematch_ids = list(
+        RematchProposal.objects.filter(
+            state=RematchProposal.State.PENDING, expires_at__lte=now
+        ).values_list("id", flat=True)[:limit]
+    )
+    expired_rematches = sum(expire_rematch_proposal(item, now=now) for item in rematch_ids)
     delivered, attempted = publish_pending(limit=limit)
     return {
         "countdowns": len(countdown_ids),
         "matches": len(due_matches) + len(finishing),
         "abandoned": abandoned,
+        "rematches_expired": expired_rematches,
         "outbox_attempted": attempted,
         "outbox_delivered": delivered,
     }

@@ -259,10 +259,10 @@
     "/matches/{match_id}/rematch/": {
       "post": {
         "operationId": "requestRematch",
-        "summary": "Request or accept a new Match in the existing Room",
+        "summary": "Request, accept, or decline a new Match in the existing Room",
         "security": [{"guestBearer": []}],
         "parameters": [{"$ref": "#/components/parameters/MatchId"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}},
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RematchCommand"}}}},
         "responses": {
           "202": {"description": "Rematch request recorded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
           "401": {"$ref": "#/components/responses/ApiError"},
@@ -291,6 +291,15 @@
         "additionalProperties": false,
         "required": ["command_id"],
         "properties": {"command_id": {"type": "string", "format": "uuid"}}
+      },
+      "RematchCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command_id"],
+        "properties": {
+          "command_id": {"type": "string", "format": "uuid"},
+          "action": {"enum": ["request", "decline"], "default": "request"}
+        }
       },
       "CreateGuestSession": {
         "type": "object",
@@ -335,7 +344,7 @@
       "RoomSnapshot": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "state", "latest_sequence", "members"],
+        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "state", "latest_sequence", "latest_match_id", "rematch", "members"],
         "properties": {
           "room_id": {"type": "string", "format": "uuid"},
           "join_code": {"type": "string", "pattern": "^[A-HJ-NP-Z2-9]{6}$"},
@@ -343,6 +352,18 @@
           "preset_id": {"type": "string"},
           "state": {"enum": ["waiting", "ready_check", "countdown", "active", "closed"]},
           "latest_sequence": {"type": "integer", "minimum": 0},
+          "latest_match_id": {"type": ["string", "null"], "format": "uuid"},
+          "rematch": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["state", "requester_participant_id", "expires_at", "new_match_id"],
+            "properties": {
+              "state": {"enum": ["pending", "accepted", "declined", "expired"]},
+              "requester_participant_id": {"type": "string", "format": "uuid"},
+              "expires_at": {"type": "string", "format": "date-time"},
+              "new_match_id": {"type": ["string", "null"], "format": "uuid"}
+            }
+          },
           "members": {
             "type": "array", "minItems": 1, "maxItems": 2,
             "items": {

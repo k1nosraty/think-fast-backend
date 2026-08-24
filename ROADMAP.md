@@ -13,7 +13,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T2 | Solo Number vertical slice | **Complete** — guest completes a Number match end-to-end |
 | T3 | Private room and realtime 1v1 | **Complete** — two guests play a shared-secret match |
 | T4 | Reliability and recovery | **Complete** — retry, deadlines, resync, restart, and reconnect are safe |
-| T5 | Rematch and gameplay polish | Complete play-rematch loop ready for playtest |
+| T5 | Rematch and gameplay polish | **Complete** — play-rematch loop and safe playtest analytics |
 | T6 | Color expansion | Color Classic and Permutation use the shared match platform |
 | T7 | Challenge expansion | Player-authored duel plus a bounded Word feasibility spike |
 | T8 | Production beta | Secure, observable, load-tested staged release |

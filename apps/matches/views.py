@@ -7,9 +7,11 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import GuestIdentity
+from apps.analytics.throttles import AnalyticsScopedRateThrottle
 from apps.matches.errors import GameAPIError
 from apps.matches.models import Room, RoomMembership
 from apps.matches.projections import snapshot
+from apps.matches.rematches import rematch_command
 from apps.matches.rooms import (
     create_room,
     join_room,
@@ -23,6 +25,7 @@ from apps.matches.serializers import (
     CreateSoloSerializer,
     GuessSerializer,
     ReadySerializer,
+    RematchSerializer,
 )
 from apps.matches.services import abandon, create_solo, refresh_match_state, submit_guess
 
@@ -49,7 +52,7 @@ class SoloMatchCreateView(APIView):
 
 
 class GuessCreateView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [AnalyticsScopedRateThrottle]
     throttle_scope = "guess"
 
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
@@ -92,6 +95,21 @@ class LeaveView(APIView):
             guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
         )
         return Response(snapshot(match, authenticated_guest(request)))
+
+
+class RematchView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "rematch"
+
+    def post(self, request: Request, match_id: uuid.UUID) -> Response:
+        serializer = RematchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        room, _, _ = rematch_command(
+            guest=authenticated_guest(request),
+            match_id=match_id,
+            **serializer.validated_data,
+        )
+        return Response(room_snapshot(room), status=status.HTTP_202_ACCEPTED)
 
 
 class RoomCreateView(APIView):

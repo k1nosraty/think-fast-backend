@@ -13,6 +13,7 @@
         "match.countdown_started", "match.started", "guess.evaluated",
         "opponent.guessed", "participant.solved", "participant.disconnected",
         "participant.reconnected", "match.finished", "rematch.requested",
+        "rematch.accepted", "rematch.declined", "rematch.expired",
         "system.resync_required"
       ]
     },

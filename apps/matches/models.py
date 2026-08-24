@@ -130,6 +130,34 @@ class Result(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class RematchProposal(models.Model):
+    class State(models.TextChoices):
+        PENDING = "pending"
+        ACCEPTED = "accepted"
+        DECLINED = "declined"
+        EXPIRED = "expired"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="rematch_proposals")
+    source_match = models.OneToOneField(
+        Match, on_delete=models.CASCADE, related_name="rematch_proposal"
+    )
+    requester = models.ForeignKey(
+        GuestIdentity, on_delete=models.PROTECT, related_name="rematch_requests"
+    )
+    state = models.CharField(max_length=20, choices=State, default=State.PENDING)
+    expires_at = models.DateTimeField()
+    new_match = models.OneToOneField(
+        Match,
+        on_delete=models.SET_NULL,
+        related_name="accepted_rematch",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class CommandRecord(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     guest = models.ForeignKey(GuestIdentity, on_delete=models.CASCADE, related_name="commands")

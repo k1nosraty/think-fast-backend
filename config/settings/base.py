@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "apps.games.apps.GamesConfig",
     "apps.matches.apps.MatchesConfig",
     "apps.realtime.apps.RealtimeConfig",
+    "apps.analytics.apps.AnalyticsConfig",
 ]
 
 MIDDLEWARE = [
@@ -102,6 +103,7 @@ REST_FRAMEWORK = {
         "guess": "120/minute",
         "snapshot": "120/minute",
         "leave": "30/hour",
+        "rematch": "60/hour",
     },
     "EXCEPTION_HANDLER": "config.api_errors.exception_handler",
 }
@@ -109,6 +111,7 @@ REST_FRAMEWORK = {
 GAME_SECRET_ENCRYPTION_KEY = get("GAME_SECRET_ENCRYPTION_KEY", "")
 FRIENDLY_COUNTDOWN_SECONDS = integer("FRIENDLY_COUNTDOWN_SECONDS", 3)
 FRIENDLY_DISCONNECT_GRACE_SECONDS = integer("FRIENDLY_DISCONNECT_GRACE_SECONDS", 30)
+REMATCH_REQUEST_TTL_SECONDS = integer("REMATCH_REQUEST_TTL_SECONDS", 60)
 
 LOGGING = {
     "version": 1,

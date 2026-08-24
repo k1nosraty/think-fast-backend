@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
+from apps.analytics.service import record_analytics
 from apps.games.domain import (
     PRESETS,
     GuessValidationError,
@@ -18,7 +19,16 @@ from apps.games.domain import (
 )
 from apps.games.secrets import decrypt_secret, encrypt_secret, generate_number_secret
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Attempt, Challenge, CommandRecord, Match, Participant, Result
+from apps.matches.models import (
+    Attempt,
+    Challenge,
+    CommandRecord,
+    Match,
+    Participant,
+    Result,
+    Room,
+    RoomMembership,
+)
 from apps.realtime.publisher import record_event
 
 
@@ -83,6 +93,15 @@ def create_solo(
         request_fingerprint=request_hash,
         match=match,
     )
+    record_analytics(
+        "match_started",
+        match_id=match.id,
+        preset_id=rules.preset_id,
+        game_type=rules.game_type,
+        match_mode=rules.match_mode,
+        schema_version=rules.schema_version,
+        evaluator_version=rules.evaluator_version,
+    )
     return match, True
 
 
@@ -105,6 +124,15 @@ def _finish(
         reason=reason,
         winner_participant_ids=[str(participant.id)] if outcome == "won" else [],
         secret_revealed=reveal,
+    )
+    record_analytics(
+        "match_completed",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        outcome=outcome,
+        reason=reason,
+        solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
     )
 
 
@@ -136,6 +164,11 @@ def _finish_friendly(match: Match, *, reason: str, now: datetime) -> None:
     match.finished_at = now
     match.finish_due_at = None
     match.save(update_fields=["state", "finished_at", "finish_due_at"])
+    if match.room_id:
+        room = Room.objects.select_for_update().get(pk=match.room_id)
+        room.state = Room.State.READY_CHECK
+        room.save(update_fields=["state", "updated_at"])
+        RoomMembership.objects.filter(room=room).update(ready=False)
     result = Result.objects.create(
         match=match,
         outcome=outcome,
@@ -153,6 +186,15 @@ def _finish_friendly(match: Match, *, reason: str, now: datetime) -> None:
             "reason": result.reason,
             "secret_revealed": True,
         },
+    )
+    record_analytics(
+        "match_completed",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        outcome=outcome,
+        reason=reason,
+        solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
     )
 
 
@@ -249,6 +291,14 @@ def _submit_guess(
         solved=solved,
         accepted_at=now,
     )
+    record_analytics(
+        "attempt_accepted",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=rules.preset_id,
+        attempt_ordinal=attempt.ordinal,
+        solved=solved,
+    )
     if rules.match_mode == "friendly":
         record_event(
             match=match,
@@ -312,9 +362,28 @@ def submit_guess(
     guess: str,
     now: datetime | None = None,
 ) -> tuple[Attempt, Match, bool]:
-    attempt, match, created = _submit_guess(
-        guest=guest, match_id=match_id, command_id=command_id, guess=guess, now=now
-    )
+    try:
+        attempt, match, created = _submit_guess(
+            guest=guest, match_id=match_id, command_id=command_id, guess=guess, now=now
+        )
+    except GameAPIError as exc:
+        if exc.default_code in {
+            "invalid_guess_length",
+            "invalid_symbol",
+            "leading_zero_not_allowed",
+            "duplicate_not_allowed",
+            "repetition_limit_exceeded",
+        }:
+            rejected_match = Match.objects.filter(pk=match_id).first()
+            if rejected_match is not None:
+                record_analytics(
+                    "invalid_guess",
+                    match_id=rejected_match.id,
+                    room_id=rejected_match.room_id,
+                    preset_id=str(rejected_match.rules["preset_id"]),
+                    error_code=exc.default_code,
+                )
+        raise
     if attempt is None:
         if hasattr(match, "result") and match.result.reason == "deadline":
             raise GameAPIError("deadline_elapsed", "Match deadline has elapsed.")
@@ -414,6 +483,27 @@ def abandon(
                     "secret_revealed": False,
                 },
             )
+            if match.room_id:
+                room = Room.objects.select_for_update().get(pk=match.room_id)
+                room.state = Room.State.READY_CHECK
+                room.save(update_fields=["state", "updated_at"])
+                RoomMembership.objects.filter(room=room).update(ready=False)
+        record_analytics(
+            "participant_abandoned",
+            match_id=match.id,
+            room_id=match.room_id,
+            preset_id=str(match.rules["preset_id"]),
+            reason="abandoned",
+        )
+        record_analytics(
+            "match_completed",
+            match_id=match.id,
+            room_id=match.room_id,
+            preset_id=str(match.rules["preset_id"]),
+            outcome="abandoned",
+            reason="abandoned",
+            solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
+        )
     elif match.state != Match.State.ABANDONED:
         raise GameAPIError("match_not_active", "Only an active match can be abandoned.")
     CommandRecord.objects.create(

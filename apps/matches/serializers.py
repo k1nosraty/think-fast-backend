@@ -19,3 +19,7 @@ class CommandSerializer(serializers.Serializer[dict[str, object]]):
 
 class ReadySerializer(CommandSerializer):
     ready = serializers.BooleanField()
+
+
+class RematchSerializer(CommandSerializer):
+    action = serializers.ChoiceField(choices=["request", "decline"], default="request")

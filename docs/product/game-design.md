@@ -78,6 +78,9 @@ waiting -> ready_check -> countdown -> active -> finishing -> finished
 - Friendly disconnect has a working-default 30-second grace period, subject to
   playtest in T4.
 - Room survives a completed match so participants can request a new Match.
+- A rematch request expires after 60 seconds. The opponent accepts by requesting
+  the same source Match, or explicitly declines. Acceptance creates entirely
+  fresh Match state while keeping the Room and its members.
 
 ### History policy
 

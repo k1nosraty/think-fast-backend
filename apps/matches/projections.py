@@ -46,6 +46,8 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         if match.result.secret_revealed:
             result["revealed_secret"] = decrypt_secret(match.challenge.protected_secret)
     actions = ["submit_guess", "leave"] if match.state == Match.State.ACTIVE else []
+    if match.room_id and match.state in {Match.State.FINISHED, Match.State.ABANDONED}:
+        actions.append("request_rematch")
     participants = list(match.participants.all())
     role = "host" if match.room is not None and match.room.host_id == guest.id else "player"
     return {

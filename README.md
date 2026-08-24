@@ -5,9 +5,10 @@ Players solve number, color, and later word challenges in solo or realtime
 matches. The server owns rules, secrets, timing, accepted attempts, feedback,
 and results.
 
-Backend Tasks T0–T4 are complete. MVP contracts are frozen at
+Backend Tasks T0–T5 are complete. MVP contracts are frozen at
 `v1.0.0-draft.1`; Solo Number and private realtime Friendly 1v1 are playable.
-Durable delivery and recovery are implemented; rematch/playtest support is T5.
+The full Room-to-rematch loop and safe playtest analytics are implemented;
+Color expansion is the next task, T6.
 
 ## MVP
 
@@ -107,6 +108,7 @@ POST /api/v1/rooms/{room_id}/join/
 POST /api/v1/rooms/{room_id}/ready/
 POST /api/v1/rooms/{room_id}/start/
 POST /api/v1/rooms/{room_id}/leave/
+POST /api/v1/matches/{match_id}/rematch/
 WS   /ws/v1/matches/{match_id}/
 WS   /ws/v1/rooms/{room_id}/
 ```
@@ -124,6 +126,7 @@ Create a local demo identity and active match after migrations:
 
 ```bash
 uv run python manage.py seed_demo
+uv run python manage.py seed_playtest
 ```
 
 ### Run every quality gate
@@ -138,7 +141,7 @@ contract validation, pytest and the 85% coverage threshold.
 ### Build the production image
 
 ```bash
-docker build --tag think-fast-backend:t4 .
+docker build --tag think-fast-backend:t5 .
 ```
 
 The image starts Daphne with `config.settings.production`. It refuses to boot
@@ -150,6 +153,12 @@ Run `uv run python manage.py sweep_reliability --limit 100` at least once per
 second in a single scheduled worker. It converges persisted countdown/deadline
 and disconnect-grace state after process restarts and retries due outbox rows.
 `publish_outbox` is available when only delivery retry is desired.
+
+Export shareable aggregate playtest data without raw guesses or secrets:
+
+```bash
+uv run python manage.py export_playtest_analytics --format json --since-days 30
+```
 
 ## Foundation and contract assets
 

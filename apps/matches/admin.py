@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.matches.models import Match, Participant, Result, Room, RoomMembership
+from apps.matches.models import Match, Participant, RematchProposal, Result, Room, RoomMembership
 
 
 @admin.register(Match)
@@ -48,3 +48,20 @@ class RoomAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     list_display = ("id", "state", "preset_id", "host", "created_at")
     readonly_fields = ("id", "join_code", "host", "preset_id", "state", "created_at", "updated_at")
     inlines = (RoomMembershipInline,)
+
+
+@admin.register(RematchProposal)
+class RematchProposalAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = ("id", "source_match", "state", "expires_at", "new_match")
+    list_filter = ("state",)
+    readonly_fields = (
+        "id",
+        "room",
+        "source_match",
+        "requester",
+        "state",
+        "expires_at",
+        "new_match",
+        "created_at",
+        "updated_at",
+    )

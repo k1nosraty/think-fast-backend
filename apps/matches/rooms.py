@@ -5,13 +5,23 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
+from apps.analytics.service import record_analytics
 from apps.games.domain import NumberRules, rules_for_mode
 from apps.games.secrets import encrypt_secret, generate_number_secret
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Challenge, CommandRecord, Match, Participant, Room, RoomMembership
+from apps.matches.models import (
+    Challenge,
+    CommandRecord,
+    Match,
+    Participant,
+    RematchProposal,
+    Room,
+    RoomMembership,
+)
 from apps.matches.services import fingerprint
 from apps.realtime.publisher import record_event, record_room_event
 
@@ -21,6 +31,14 @@ JOIN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 def room_snapshot(room: Room) -> dict[str, object]:
     members = list(room.memberships.all())
     host_membership = next(member for member in members if member.guest_id == room.host_id)
+    latest_match = room.matches.order_by("-created_at").first()
+    proposal = (
+        RematchProposal.objects.filter(Q(source_match=latest_match) | Q(new_match=latest_match))
+        .order_by("-created_at")
+        .first()
+        if latest_match is not None
+        else None
+    )
     return {
         "room_id": str(room.id),
         "join_code": room.join_code,
@@ -28,6 +46,17 @@ def room_snapshot(room: Room) -> dict[str, object]:
         "preset_id": room.preset_id,
         "state": room.state,
         "latest_sequence": room.latest_sequence,
+        "latest_match_id": str(latest_match.id) if latest_match else None,
+        "rematch": {
+            "state": proposal.state,
+            "requester_participant_id": str(
+                next(member.id for member in members if member.guest_id == proposal.requester_id)
+            ),
+            "expires_at": proposal.expires_at.isoformat().replace("+00:00", "Z"),
+            "new_match_id": str(proposal.new_match_id) if proposal.new_match_id else None,
+        }
+        if proposal
+        else None,
         "members": [
             {
                 "participant_id": str(member.id),
@@ -43,6 +72,65 @@ def room_snapshot(room: Room) -> dict[str, object]:
 
 def _join_code() -> str:
     return "".join(secrets.choice(JOIN_ALPHABET) for _ in range(6))
+
+
+def _create_friendly_match(
+    *,
+    room: Room,
+    members: list[RoomMembership],
+    secret_factory: Callable[[NumberRules], str] | None = None,
+) -> Match:
+    rules = rules_for_mode(room.preset_id, "friendly")
+    assert rules is not None
+    now = timezone.now()
+    countdown_seconds = settings.FRIENDLY_COUNTDOWN_SECONDS
+    started_at = now + timedelta(seconds=countdown_seconds)
+    match = Match.objects.create(
+        room=room,
+        state=Match.State.ACTIVE if countdown_seconds == 0 else Match.State.COUNTDOWN,
+        rules=rules.snapshot(),
+        started_at=started_at,
+        deadline=started_at + timedelta(seconds=rules.match_deadline_seconds),
+    )
+    for member in members:
+        Participant.objects.create(
+            match=match,
+            guest=member.guest,
+            display_name=member.display_name,
+            avatar_id=member.avatar_id,
+            connected=member.connected,
+        )
+    factory = secret_factory or generate_number_secret
+    Challenge.objects.create(match=match, protected_secret=encrypt_secret(factory(rules)))
+    room.state = Room.State.ACTIVE
+    room.save(update_fields=["state", "updated_at"])
+    record_event(
+        match=match,
+        event_type="match.countdown_started",
+        visibility="match",
+        payload={"countdown_seconds": countdown_seconds},
+    )
+    if countdown_seconds == 0:
+        record_event(
+            match=match,
+            event_type="match.started",
+            visibility="match",
+            payload={
+                "started_at": started_at.isoformat().replace("+00:00", "Z"),
+                "deadline": match.deadline.isoformat().replace("+00:00", "Z"),
+            },
+        )
+    record_analytics(
+        "match_started",
+        match_id=match.id,
+        room_id=room.id,
+        preset_id=rules.preset_id,
+        game_type=rules.game_type,
+        match_mode=rules.match_mode,
+        schema_version=rules.schema_version,
+        evaluator_version=rules.evaluator_version,
+    )
+    return match
 
 
 @transaction.atomic
@@ -225,30 +313,7 @@ def start_room(
         raise GameAPIError("not_ready", "Exactly two ready players are required.")
     if room.state != Room.State.READY_CHECK:
         raise GameAPIError("not_ready", "Room cannot start in its current state.")
-    rules = rules_for_mode(room.preset_id, "friendly")
-    assert rules is not None
-    now = timezone.now()
-    countdown_seconds = settings.FRIENDLY_COUNTDOWN_SECONDS
-    started_at = now + timedelta(seconds=countdown_seconds)
-    match = Match.objects.create(
-        room=room,
-        state=Match.State.ACTIVE if countdown_seconds == 0 else Match.State.COUNTDOWN,
-        rules=rules.snapshot(),
-        started_at=started_at,
-        deadline=started_at + timedelta(seconds=rules.match_deadline_seconds),
-    )
-    for member in members:
-        Participant.objects.create(
-            match=match,
-            guest=member.guest,
-            display_name=member.display_name,
-            avatar_id=member.avatar_id,
-            connected=member.connected,
-        )
-    factory = secret_factory or generate_number_secret
-    Challenge.objects.create(match=match, protected_secret=encrypt_secret(factory(rules)))
-    room.state = Room.State.ACTIVE
-    room.save(update_fields=["state", "updated_at"])
+    match = _create_friendly_match(room=room, members=members, secret_factory=secret_factory)
     CommandRecord.objects.create(
         guest=guest,
         command_id=command_id,
@@ -257,22 +322,6 @@ def start_room(
         room=room,
         match=match,
     )
-    record_event(
-        match=match,
-        event_type="match.countdown_started",
-        visibility="match",
-        payload={"countdown_seconds": countdown_seconds},
-    )
-    if countdown_seconds == 0:
-        record_event(
-            match=match,
-            event_type="match.started",
-            visibility="match",
-            payload={
-                "started_at": started_at.isoformat().replace("+00:00", "Z"),
-                "deadline": match.deadline.isoformat().replace("+00:00", "Z"),
-            },
-        )
     return match, True
 
 

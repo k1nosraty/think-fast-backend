@@ -8,4 +8,4 @@ delivery is at-least-once and disposable.
 Clients apply only the next sequence, ignore duplicates, and send a `resync`
 command with their last applied sequence after a gap. Invalid cursors require a
 fresh authorized HTTP Snapshot. Run `sweep_reliability` periodically so pending
-deadlines, grace expiries, and outbox rows converge after process restarts.
+deadlines, grace/rematch expiries, and outbox rows converge after process restarts.

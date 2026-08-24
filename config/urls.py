@@ -8,6 +8,7 @@ from apps.games.views import GameDefinitionListView
 from apps.matches.views import (
     GuessCreateView,
     LeaveView,
+    RematchView,
     RoomCreateView,
     RoomDetailView,
     RoomJoinView,
@@ -35,4 +36,9 @@ urlpatterns = [
     path("api/v1/matches/<uuid:match_id>/guesses/", GuessCreateView.as_view(), name="guess-create"),
     path("api/v1/matches/<uuid:match_id>/snapshot/", SnapshotView.as_view(), name="match-snapshot"),
     path("api/v1/matches/<uuid:match_id>/leave/", LeaveView.as_view(), name="match-leave"),
+    path(
+        "api/v1/matches/<uuid:match_id>/rematch/",
+        RematchView.as_view(),
+        name="match-rematch",
+    ),
 ]

@@ -113,7 +113,10 @@ Candidate event types:
 | `participant.disconnected` | match public | presence |
 | `participant.reconnected` | match public | presence |
 | `match.finished` | viewer-specific | result and authorized reveal |
-| `rematch.requested` | room public | rematch readiness |
+| `rematch.requested` | room public | pending proposal and expiry |
+| `rematch.accepted` | room public | new Match identity |
+| `rematch.declined` | room public | explicit decline/cancel |
+| `rematch.expired` | room public | proposal timeout |
 | `system.resync_required` | connection private | fetch snapshot after a gap |
 
 Persisted match sequence is monotonic. Delivery may be duplicated or delayed;
@@ -152,6 +155,14 @@ An authorized snapshot contains:
 
 It must never contain another player's Guess/Feedback or an unrevealed Secret.
 Initial load, page refresh, reconnect, and event-gap recovery all use Snapshot.
+
+## Rematch contract
+
+`POST /matches/{match_id}/rematch/` accepts a command ID and optional
+`action: request|decline` (`request` by default). The first request opens a
+60-second proposal; the other participant's request accepts it. The Room
+snapshot exposes `latest_match_id` plus proposal state, requester, expiry and
+the new Match ID. Clients then subscribe to/fetch the new Match normally.
 
 ## Error envelope
 

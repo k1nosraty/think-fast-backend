@@ -117,6 +117,10 @@ survive restart; reliability suites pass repeatedly.
 
 **Effort:** High.
 
+**Status:** Complete on 2026-08-24. Rematch request/accept/decline/expiry,
+fresh-Match isolation, privacy-safe analytics and playtest seed/export tools are
+implemented. The next task is T6; do not add Color behavior implicitly.
+
 - Implement rematch request/accept/decline/expiry inside the existing Room; each
   rematch creates a new immutable Match/RuleSet/Secret.
 - Add privacy-safe aggregate analytics ports/events for start, completion,

@@ -66,6 +66,7 @@ Canonical duplicate examples live in
 | Multiplayer disconnect | Timer continues |
 | Friendly reconnect grace | 30 seconds |
 | Connection replacement | New authenticated connection becomes primary |
+| Rematch proposal | 60 seconds; opponent request accepts; explicit decline |
 | Reveal on normal solved/unsolved finish | Yes, to participants |
 | Reveal on abandoned/voided/cancelled | No by default |
 
@@ -92,6 +93,9 @@ These values are versioned preset/competition policy, not hardcoded UI behavior.
 | Protected Secret | Delete or cryptographically make inaccessible within 24 hours after terminal Match, unless a documented security incident hold applies |
 | Operational logs | 30 days, secret/private-Guess redacted |
 | Aggregate analytics | May persist without raw Secret or private Guess |
+
+T5 narrows aggregate analytics further: Guess, Feedback, Secret, token, guest
+identity and arbitrary payload fields are prohibited by the analytics port.
 
 Production legal/privacy review in T8 may shorten these periods. It must not
 silently lengthen sensitive-data retention.
