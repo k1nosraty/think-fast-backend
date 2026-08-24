@@ -5,6 +5,7 @@
     {"path": "fixtures/errors/repetition-limit-exceeded.json", "schema": "schemas/error.schema.json"},
     {"path": "fixtures/events/opponent-guessed.json", "schema": "schemas/event.schema.json"},
     {"path": "fixtures/events/guess-evaluated.json", "schema": "schemas/event.schema.json"},
+    {"path": "fixtures/events/room-ready-changed.json", "schema": "schemas/event.schema.json"},
     {"path": "fixtures/snapshots/solo-active.json", "schema": "schemas/snapshot.schema.json"},
     {"path": "fixtures/snapshots/friendly-active.json", "schema": "schemas/snapshot.schema.json"},
     {"path": "fixtures/requests/submit-guess.json", "schema": "schemas/guess-command.schema.json"},

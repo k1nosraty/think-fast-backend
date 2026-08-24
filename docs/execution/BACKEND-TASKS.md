@@ -75,6 +75,9 @@ Secret never leaks before authorized reveal; all gates pass.
 
 **Effort:** Very high.
 
+**Status:** Complete on 2026-08-24. Private Friendly 1v1 is implemented; the
+next task is T4 reliability/recovery and must not be folded back into T3.
+
 - Implement Room separate from Match: join code, host/transfer, capacity,
   membership, Ready reset, start permission, participant freeze, late-join deny.
 - Create one shared Challenge with independent participant Attempts.

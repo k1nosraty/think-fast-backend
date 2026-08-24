@@ -15,3 +15,7 @@ class GuessSerializer(serializers.Serializer[dict[str, object]]):
 
 class CommandSerializer(serializers.Serializer[dict[str, object]]):
     command_id = serializers.UUIDField()
+
+
+class ReadySerializer(CommandSerializer):
+    ready = serializers.BooleanField()

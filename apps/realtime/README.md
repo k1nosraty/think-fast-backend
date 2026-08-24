@@ -1,4 +1,5 @@
 # Realtime boundary
 
-Owns Channels routing, consumers and event delivery when T3 requests them. The
-T1 ASGI boundary is wired but deliberately exposes no WebSocket route.
+T3 exposes `/ws/v1/matches/{match_id}/` with Guest authentication, membership
+authorization, persisted event lookup, presence, start/result events and strict
+private/public projections. Durable retry and gap recovery remain T4.

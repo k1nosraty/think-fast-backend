@@ -4,7 +4,8 @@
   "title": "RealtimeEvent",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "version", "match_id", "sequence", "occurred_at", "visibility", "payload"],
+  "required": ["type", "version", "sequence", "occurred_at", "visibility", "payload"],
+  "anyOf": [{"required": ["match_id"]}, {"required": ["room_id"]}],
   "properties": {
     "type": {
       "enum": [
@@ -17,6 +18,7 @@
     },
     "version": {"const": 1},
     "match_id": {"type": "string", "format": "uuid"},
+    "room_id": {"type": "string", "format": "uuid"},
     "sequence": {"type": "integer", "minimum": 1},
     "occurred_at": {"type": "string", "format": "date-time"},
     "visibility": {"enum": ["room", "match", "participant", "connection"]},

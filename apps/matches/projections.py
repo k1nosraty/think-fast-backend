@@ -34,8 +34,11 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
     ]
     result = None
     if hasattr(match, "result"):
+        outcome = match.result.outcome
+        if outcome == "won" and str(participant.id) not in match.result.winner_participant_ids:
+            outcome = "lost"
         result = {
-            "outcome": match.result.outcome,
+            "outcome": outcome,
             "winner_participant_ids": match.result.winner_participant_ids,
             "reason": match.result.reason,
             "secret_revealed": match.result.secret_revealed,
@@ -43,10 +46,12 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         if match.result.secret_revealed:
             result["revealed_secret"] = decrypt_secret(match.challenge.protected_secret)
     actions = ["submit_guess", "leave"] if match.state == Match.State.ACTIVE else []
+    participants = list(match.participants.all())
+    role = "host" if match.room is not None and match.room.host_id == guest.id else "player"
     return {
         "contract_version": "v1.0.0-draft.1",
         "match_id": str(match.id),
-        "room_id": None,
+        "room_id": str(match.room_id) if match.room_id else None,
         "state": match.state,
         "rules": match.rules,
         "server_time": iso(timezone.now()),
@@ -55,19 +60,20 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         "viewer": {
             "participant_id": str(participant.id),
             "display_name": participant.display_name,
-            "role": "player",
+            "role": role,
         },
         "participants": [
             {
-                "participant_id": str(participant.id),
-                "display_name": participant.display_name,
-                "avatar_id": participant.avatar_id,
+                "participant_id": str(item.id),
+                "display_name": item.display_name,
+                "avatar_id": item.avatar_id,
                 "connection_state": "abandoned"
-                if participant.solve_state == "abandoned"
-                else "connected",
-                "attempt_count": participant.attempt_count,
-                "solve_state": participant.solve_state,
+                if item.solve_state == "abandoned"
+                else ("connected" if item.connected else "disconnected"),
+                "attempt_count": item.attempt_count,
+                "solve_state": item.solve_state,
             }
+            for item in participants
         ],
         "own_attempts": attempts,
         "result": result,

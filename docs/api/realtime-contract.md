@@ -7,7 +7,8 @@ recovery. T0 is complete: the canonical machine-readable source is
 
 ## Global rules
 
-- HTTP base: `/api/v1/`; WebSocket: `/ws/v1/matches/{match_id}/`.
+- HTTP base: `/api/v1/`; WebSockets: `/ws/v1/rooms/{room_id}/` for lobby
+  updates and `/ws/v1/matches/{match_id}/` for gameplay.
 - Public IDs are UUIDs; timestamps are ISO-8601 UTC.
 - Client sends intent, not authoritative state, rules, time, score, or attempt
   number.
@@ -118,6 +119,10 @@ Candidate event types:
 Persisted match sequence is monotonic. Delivery may be duplicated or delayed;
 clients ignore an already-applied sequence and fetch Snapshot on an unexplained
 gap. Event delivery is not the source of truth.
+
+Room events use `room_id` and a monotonic sequence scoped to the Room. Match
+events use `match_id` and a monotonic sequence scoped to the Match. They never
+share one sequence space.
 
 ## Snapshot contract
 

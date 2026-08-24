@@ -9,7 +9,7 @@ FeedbackToken = Literal["exact", "present", "absent"]
 class NumberRules:
     preset_id: str
     game_type: Literal["number"]
-    match_mode: Literal["practice"]
+    match_mode: Literal["practice", "friendly"]
     schema_version: int
     evaluator_version: int
     sequence_length: int
@@ -57,6 +57,15 @@ PRESETS = {
         15,
     ),
 }
+
+
+def rules_for_mode(preset_id: str, mode: Literal["practice", "friendly"]) -> NumberRules | None:
+    rules = PRESETS.get(preset_id)
+    if rules is None:
+        return None
+    values = rules.snapshot()
+    values["match_mode"] = mode
+    return NumberRules(**values)  # type: ignore[arg-type]
 
 
 class GuessValidationError(ValueError):

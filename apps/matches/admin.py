@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.matches.models import Match, Participant, Result
+from apps.matches.models import Match, Participant, Result, Room, RoomMembership
 
 
 @admin.register(Match)
@@ -26,3 +26,25 @@ class ResultAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "secret_revealed",
         "created_at",
     )
+
+
+class RoomMembershipInline(admin.TabularInline):  # type: ignore[type-arg]
+    model = RoomMembership
+    extra = 0
+    readonly_fields = (
+        "id",
+        "guest",
+        "display_name",
+        "avatar_id",
+        "ready",
+        "connected",
+        "joined_at",
+    )
+    can_delete = False
+
+
+@admin.register(Room)
+class RoomAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = ("id", "state", "preset_id", "host", "created_at")
+    readonly_fields = ("id", "join_code", "host", "preset_id", "state", "created_at", "updated_at")
+    inlines = (RoomMembershipInline,)

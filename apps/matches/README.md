@@ -1,5 +1,6 @@
 # Matches boundary
 
-T2 owns the Solo lifecycle, participant, protected challenge, immutable attempts,
-result, idempotent application services, projections and REST adapters. Rooms
-and multiplayer remain T3 scope.
+Owns Solo and T3 Friendly lifecycle, Room/membership/Ready/host behavior,
+participant snapshots, protected shared Challenge, immutable Attempts, tie
+finalization, results, idempotent services and REST projections. Reliable
+delivery/recovery refinements remain T4.

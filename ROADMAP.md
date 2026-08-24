@@ -11,7 +11,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T0 | Decision and contract freeze | **Complete** — MVP rules and v1 draft contract frozen |
 | T1 | Engineering foundation | **Complete** — reproducible local/CI backend foundation |
 | T2 | Solo Number vertical slice | **Complete** — guest completes a Number match end-to-end |
-| T3 | Private room and realtime 1v1 | Two guests play a shared-secret match |
+| T3 | Private room and realtime 1v1 | **Complete** — two guests play a shared-secret match |
 | T4 | Reliability and recovery | Retry, concurrency, timeout, refresh, and reconnect are safe |
 | T5 | Rematch and gameplay polish | Complete play-rematch loop ready for playtest |
 | T6 | Color expansion | Color Classic and Permutation use the shared match platform |

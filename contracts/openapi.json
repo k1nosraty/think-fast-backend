@@ -106,9 +106,24 @@
             "description": "Room created",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}
           },
+          "200": {"description": "Existing Room returned for the same command ID", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
           "400": {"$ref": "#/components/responses/ApiError"},
           "401": {"$ref": "#/components/responses/ApiError"},
           "429": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/rooms/{room_id}/": {
+      "get": {
+        "operationId": "getRoomSnapshot",
+        "summary": "Get an authorized Room snapshot for lobby recovery",
+        "security": [{"guestBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
+        "responses": {
+          "200": {"description": "Authorized Room snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"}
         }
       }
     },
@@ -167,8 +182,25 @@
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}},
         "responses": {
           "201": {"description": "Match created", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
+          "200": {"description": "Existing Match returned for the same command ID", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
           "401": {"$ref": "#/components/responses/ApiError"},
           "403": {"$ref": "#/components/responses/ApiError"},
+          "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/rooms/{room_id}/leave/": {
+      "post": {
+        "operationId": "leaveRoom",
+        "summary": "Leave a waiting room and transfer host ownership when required",
+        "security": [{"guestBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}},
+        "responses": {
+          "200": {"description": "Room membership removed; returns the updated Room or closed state"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"},
           "409": {"$ref": "#/components/responses/ApiError"}
         }
       }
@@ -303,13 +335,14 @@
       "RoomSnapshot": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "state", "members"],
+        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "state", "latest_sequence", "members"],
         "properties": {
           "room_id": {"type": "string", "format": "uuid"},
           "join_code": {"type": "string", "pattern": "^[A-HJ-NP-Z2-9]{6}$"},
           "host_participant_id": {"type": "string", "format": "uuid"},
           "preset_id": {"type": "string"},
           "state": {"enum": ["waiting", "ready_check", "countdown", "active", "closed"]},
+          "latest_sequence": {"type": "integer", "minimum": 0},
           "members": {
             "type": "array", "minItems": 1, "maxItems": 2,
             "items": {

@@ -5,9 +5,9 @@ Players solve number, color, and later word challenges in solo or realtime
 matches. The server owns rules, secrets, timing, accepted attempts, feedback,
 and results.
 
-Backend Tasks T0–T2 are complete. MVP contracts are frozen at
-`v1.0.0-draft.1`; the reproducible Django foundation and Solo Number vertical
-slice are ready. Friendly rooms and realtime play have not started; next is T3.
+Backend Tasks T0–T3 are complete. MVP contracts are frozen at
+`v1.0.0-draft.1`; Solo Number and private realtime Friendly 1v1 are playable.
+Reliability/recovery hardening is the next task, T4.
 
 ## MVP
 
@@ -99,6 +99,22 @@ GET  /api/v1/matches/{match_id}/snapshot/
 POST /api/v1/matches/{match_id}/leave/
 ```
 
+Friendly lobby commands add:
+
+```text
+POST /api/v1/rooms/
+POST /api/v1/rooms/{room_id}/join/
+POST /api/v1/rooms/{room_id}/ready/
+POST /api/v1/rooms/{room_id}/start/
+POST /api/v1/rooms/{room_id}/leave/
+WS   /ws/v1/matches/{match_id}/
+WS   /ws/v1/rooms/{room_id}/
+```
+
+Native clients may send `Authorization: Bearer <token>` in the WebSocket
+handshake. Browsers should request subprotocols `think-fast` and
+`bearer.<token>`; query-string tokens are rejected.
+
 Create a local demo identity and active match after migrations:
 
 ```bash
@@ -117,7 +133,7 @@ contract validation, pytest and the 85% coverage threshold.
 ### Build the production image
 
 ```bash
-docker build --tag think-fast-backend:t2 .
+docker build --tag think-fast-backend:t3 .
 ```
 
 The image starts Daphne with `config.settings.production`. It refuses to boot
