@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/number-feedback-cases.schema.json",
+  "title": "NumberFeedbackCases",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "cases"],
+  "properties": {
+    "contract_version": {"const": "v1.0.0-draft.1"},
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "preset_id", "secret", "guess", "valid", "expected"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1"]},
+          "secret": {"type": "string", "pattern": "^[0-9]{5,6}$"},
+          "guess": {"type": "string", "minLength": 1},
+          "valid": {"type": "boolean"},
+          "expected": {
+            "oneOf": [
+              {"$ref": "feedback.schema.json"},
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["error_code"],
+                "properties": {
+                  "error_code": {"enum": ["invalid_guess_length", "invalid_symbol", "leading_zero_not_allowed", "repetition_limit_exceeded"]}
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

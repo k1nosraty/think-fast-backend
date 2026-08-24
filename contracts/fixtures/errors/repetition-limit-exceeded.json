@@ -1,0 +1,7 @@
+{
+  "code": "repetition_limit_exceeded",
+  "message": "A digit may appear at most twice in this preset.",
+  "field_errors": {"guess": ["repetition_limit_exceeded"]},
+  "request_id": "c465263c-84c6-474c-9f97-4336344d73e1",
+  "retryable": false
+}

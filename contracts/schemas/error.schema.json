@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/error.schema.json",
+  "title": "ApiError",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message", "field_errors", "request_id", "retryable"],
+  "properties": {
+    "code": {
+      "enum": [
+        "invalid_guess_length", "invalid_symbol", "leading_zero_not_allowed", "duplicate_not_allowed",
+        "repetition_limit_exceeded", "match_not_active", "deadline_elapsed",
+        "attempt_limit_reached", "room_not_found", "room_full",
+        "not_room_host", "not_ready", "idempotency_conflict", "rate_limited",
+        "resync_required", "client_version_unsupported"
+      ]
+    },
+    "message": {"type": "string", "minLength": 1},
+    "field_errors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1}
+      }
+    },
+    "request_id": {"type": "string", "format": "uuid"},
+    "retryable": {"type": "boolean"},
+    "retry_after_seconds": {"type": "integer", "minimum": 0}
+  }
+}

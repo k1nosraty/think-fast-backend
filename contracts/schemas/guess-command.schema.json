@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/guess-command.schema.json",
+  "title": "SubmitGuessCommand",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command_id", "guess"],
+  "properties": {
+    "command_id": {"type": "string", "format": "uuid"},
+    "guess": {"type": "string", "pattern": "^[0-9]{5,6}$"}
+  }
+}

@@ -18,6 +18,9 @@ the current repository. The separate React repository has its own task plan.
 
 **Effort:** High. **Code:** contracts/tooling only; no gameplay implementation.
 
+**Status:** Complete on 2026-08-24. Do not rerun or reinterpret it implicitly;
+use the decision register and versioned contracts.
+
 - Record final Phase 0 choices from Product/Frontend/Backend: Number rules,
   history, timer/attempt, win/tie/reveal, guest/auth, retention, capacity.
 - Freeze OpenAPI plus versioned event/error/snapshot schemas and canonical JSON

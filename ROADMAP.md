@@ -8,7 +8,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 
 | Task | Milestone | Playable outcome |
 | --- | --- | --- |
-| T0 | Decision and contract freeze | MVP rules and v1 contract baseline approved |
+| T0 | Decision and contract freeze | **Complete** — MVP rules and v1 draft contract frozen |
 | T1 | Engineering foundation | Reproducible local/CI backend foundation |
 | T2 | Solo Number vertical slice | Guest completes a Number match end-to-end |
 | T3 | Private room and realtime 1v1 | Two guests play a shared-secret match |

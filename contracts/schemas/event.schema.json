@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/event.schema.json",
+  "title": "RealtimeEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "version", "match_id", "sequence", "occurred_at", "visibility", "payload"],
+  "properties": {
+    "type": {
+      "enum": [
+        "room.player_joined", "room.player_left", "room.ready_changed",
+        "match.countdown_started", "match.started", "guess.evaluated",
+        "opponent.guessed", "participant.solved", "participant.disconnected",
+        "participant.reconnected", "match.finished", "rematch.requested",
+        "system.resync_required"
+      ]
+    },
+    "version": {"const": 1},
+    "match_id": {"type": "string", "format": "uuid"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "visibility": {"enum": ["room", "match", "participant", "connection"]},
+    "payload": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"type": {"const": "opponent.guessed"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["participant_id", "attempt_count"],
+            "properties": {
+              "participant_id": {"type": "string", "format": "uuid"},
+              "attempt_count": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "guess.evaluated"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "participant"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["participant_id", "attempt_id", "ordinal", "feedback", "solved"],
+            "properties": {
+              "participant_id": {"type": "string", "format": "uuid"},
+              "attempt_id": {"type": "string", "format": "uuid"},
+              "ordinal": {"type": "integer", "minimum": 1},
+              "feedback": {"$ref": "feedback.schema.json"},
+              "solved": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ other files link to it instead of copying it.
 | Need | Source of truth |
 | --- | --- |
 | Product scope and gameplay behavior | `product/game-design.md` |
+| Accepted Phase 0 values | `product/phase-0-decisions.md` |
 | System boundaries and runtime behavior | `architecture/overview.md` |
 | Domain concepts and invariants | `architecture/domain-model.md` |
 | HTTP, WebSocket, errors, snapshot | `api/realtime-contract.md` |

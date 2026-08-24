@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/feedback.schema.json",
+  "title": "Feedback",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "positions"],
+      "properties": {
+        "kind": {"const": "positional"},
+        "positions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"enum": ["exact", "present", "absent"]}
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "exact_count", "present_count"],
+      "properties": {
+        "kind": {"const": "aggregate"},
+        "exact_count": {"type": "integer", "minimum": 0},
+        "present_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "exact_count"],
+      "properties": {
+        "kind": {"const": "exact_count"},
+        "exact_count": {"type": "integer", "minimum": 0}
+      }
+    }
+  ]
+}

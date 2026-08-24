@@ -1,0 +1,55 @@
+{
+  "contract_version": "v1.0.0-draft.1",
+  "match_id": "9255e374-cd42-4f49-a871-869b30b3b9c8",
+  "room_id": null,
+  "state": "active",
+  "rules": {
+    "preset_id": "number_classic_5_v1",
+    "game_type": "number",
+    "match_mode": "practice",
+    "schema_version": 1,
+    "evaluator_version": 1,
+    "sequence_length": 5,
+    "allow_leading_zero": false,
+    "allow_duplicates": true,
+    "max_symbol_repetition": 2,
+    "feedback_policy": "positional",
+    "history_policy": {"type": "full"},
+    "match_deadline_seconds": 180,
+    "attempt_limit": 12
+  },
+  "server_time": "2026-08-24T08:30:00Z",
+  "started_at": "2026-08-24T08:29:00Z",
+  "deadline": "2026-08-24T08:32:00Z",
+  "viewer": {
+    "participant_id": "6c6e8d60-2139-4f1b-b8e9-e893da4af84a",
+    "display_name": "Amir",
+    "role": "player"
+  },
+  "participants": [
+    {
+      "participant_id": "6c6e8d60-2139-4f1b-b8e9-e893da4af84a",
+      "display_name": "Amir",
+      "avatar_id": "avatar_01",
+      "connection_state": "connected",
+      "attempt_count": 1,
+      "solve_state": "playing"
+    }
+  ],
+  "own_attempts": [
+    {
+      "attempt_id": "c21af716-98f6-410d-af25-bcaa5126bb2d",
+      "ordinal": 1,
+      "guess": "12345",
+      "feedback": {
+        "kind": "positional",
+        "positions": ["exact", "present", "absent", "present", "exact"]
+      },
+      "accepted_at": "2026-08-24T08:29:30Z",
+      "solved": false
+    }
+  ],
+  "result": null,
+  "latest_sequence": 3,
+  "available_actions": ["submit_guess", "leave"]
+}

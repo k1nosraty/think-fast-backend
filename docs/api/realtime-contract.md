@@ -1,8 +1,9 @@
 # Frontend–Backend Contract Baseline
 
-This document is the single source of truth for protocol principles, resources,
-events, errors, and recovery. T0 converts the baseline into machine-readable
-OpenAPI and event-schema artifacts with canonical fixtures.
+This document explains protocol principles, resources, events, errors, and
+recovery. T0 is complete: the canonical machine-readable source is
+`contracts/openapi.json`, its JSON Schemas, manifest, and fixtures at
+`v1.0.0-draft.1`.
 
 ## Global rules
 
@@ -17,7 +18,7 @@ OpenAPI and event-schema artifacts with canonical fixtures.
 - Secrets and opponent-private Guess/Feedback are prohibited unless an explicit
   reveal policy authorizes them after terminal state.
 
-## Candidate HTTP surface
+## Frozen v1 draft HTTP surface
 
 ```text
 POST /api/v1/guest-sessions/
@@ -33,8 +34,8 @@ POST /api/v1/matches/{match_id}/rematch/
 GET  /api/v1/matches/{match_id}/snapshot/
 ```
 
-Exact paths may be refined in T0, but resource ownership and semantics must not
-change implicitly during implementation.
+Compatible detail may be added during implementation. A rename, removal, or
+semantic change requires explicit contract versioning and coordinated review.
 
 ## Command outcome
 
@@ -152,6 +153,7 @@ Initial stable codes include:
 ```text
 invalid_guess_length
 invalid_symbol
+leading_zero_not_allowed
 duplicate_not_allowed
 repetition_limit_exceeded
 match_not_active

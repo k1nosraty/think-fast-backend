@@ -1,0 +1,12 @@
+{
+  "type": "opponent.guessed",
+  "version": 1,
+  "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+  "sequence": 18,
+  "occurred_at": "2026-08-24T08:30:00Z",
+  "visibility": "match",
+  "payload": {
+    "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+    "attempt_count": 4
+  }
+}

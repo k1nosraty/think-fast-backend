@@ -1,0 +1,18 @@
+{
+  "type": "guess.evaluated",
+  "version": 1,
+  "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+  "sequence": 17,
+  "occurred_at": "2026-08-24T08:29:59.750Z",
+  "visibility": "participant",
+  "payload": {
+    "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+    "attempt_id": "c21af716-98f6-410d-af25-bcaa5126bb2d",
+    "ordinal": 4,
+    "feedback": {
+      "kind": "positional",
+      "positions": ["exact", "present", "absent", "present", "exact"]
+    },
+    "solved": false
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "contract_version": "v1.0.0-draft.1",
+  "cases": [
+    {
+      "id": "all_exact_with_duplicate_secret",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "11234",
+      "valid": true,
+      "expected": {"kind": "positional", "positions": ["exact", "exact", "exact", "exact", "exact"]}
+    },
+    {
+      "id": "all_absent",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "56789",
+      "valid": true,
+      "expected": {"kind": "positional", "positions": ["absent", "absent", "absent", "absent", "absent"]}
+    },
+    {
+      "id": "mixed_exact_and_present",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "14231",
+      "valid": true,
+      "expected": {"kind": "positional", "positions": ["exact", "present", "exact", "exact", "present"]}
+    },
+    {
+      "id": "duplicate_guess_consumes_single_secret_symbol",
+      "preset_id": "number_classic_5_v1",
+      "secret": "12345",
+      "guess": "11234",
+      "valid": true,
+      "expected": {"kind": "positional", "positions": ["exact", "absent", "present", "present", "present"]}
+    },
+    {
+      "id": "duplicate_secret_inventory_is_consumed",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "12143",
+      "valid": true,
+      "expected": {"kind": "positional", "positions": ["exact", "present", "present", "present", "present"]}
+    },
+    {
+      "id": "leading_zero_is_invalid",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "01234",
+      "valid": false,
+      "expected": {"error_code": "leading_zero_not_allowed"}
+    },
+    {
+      "id": "short_guess_is_invalid",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "1234",
+      "valid": false,
+      "expected": {"error_code": "invalid_guess_length"}
+    },
+    {
+      "id": "non_digit_is_invalid",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "12a34",
+      "valid": false,
+      "expected": {"error_code": "invalid_symbol"}
+    },
+    {
+      "id": "repetition_over_two_is_invalid",
+      "preset_id": "number_classic_5_v1",
+      "secret": "11234",
+      "guess": "11123",
+      "valid": false,
+      "expected": {"error_code": "repetition_limit_exceeded"}
+    },
+    {
+      "id": "six_digit_duplicate_safe",
+      "preset_id": "number_brain_burner_6_v1",
+      "secret": "120231",
+      "guess": "102312",
+      "valid": true,
+      "expected": {"kind": "positional", "positions": ["exact", "present", "present", "present", "present", "present"]}
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/snapshot.schema.json",
+  "title": "MatchSnapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "match_id", "room_id", "state", "rules",
+    "server_time", "started_at", "deadline", "viewer", "participants",
+    "own_attempts", "result", "latest_sequence", "available_actions"
+  ],
+  "properties": {
+    "contract_version": {"const": "v1.0.0-draft.1"},
+    "match_id": {"type": "string", "format": "uuid"},
+    "room_id": {"type": ["string", "null"], "format": "uuid"},
+    "state": {"enum": ["waiting", "ready_check", "countdown", "active", "finishing", "finished", "cancelled", "abandoned", "voided"]},
+    "rules": {"$ref": "ruleset.schema.json"},
+    "server_time": {"type": "string", "format": "date-time"},
+    "started_at": {"type": ["string", "null"], "format": "date-time"},
+    "deadline": {"type": ["string", "null"], "format": "date-time"},
+    "viewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participant_id", "display_name", "role"],
+      "properties": {
+        "participant_id": {"type": "string", "format": "uuid"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+        "role": {"enum": ["player", "host"]}
+      }
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["participant_id", "display_name", "avatar_id", "connection_state", "attempt_count", "solve_state"],
+        "properties": {
+          "participant_id": {"type": "string", "format": "uuid"},
+          "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+          "avatar_id": {"type": "string", "minLength": 1},
+          "connection_state": {"enum": ["connected", "disconnected", "abandoned"]},
+          "attempt_count": {"type": "integer", "minimum": 0},
+          "solve_state": {"enum": ["playing", "solved", "unsolved", "abandoned"]}
+        }
+      }
+    },
+    "own_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt_id", "ordinal", "guess", "feedback", "accepted_at", "solved"],
+        "properties": {
+          "attempt_id": {"type": "string", "format": "uuid"},
+          "ordinal": {"type": "integer", "minimum": 1},
+          "guess": {"type": "string", "pattern": "^[0-9]{5,6}$"},
+          "feedback": {"$ref": "feedback.schema.json"},
+          "accepted_at": {"type": "string", "format": "date-time"},
+          "solved": {"type": "boolean"}
+        }
+      }
+    },
+    "result": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "winner_participant_ids", "reason", "secret_revealed"],
+          "properties": {
+            "outcome": {"enum": ["won", "lost", "draw", "unsolved", "abandoned", "voided"]},
+            "winner_participant_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}},
+            "reason": {"enum": ["solved", "deadline", "attempt_limit", "abandoned", "voided"]},
+            "secret_revealed": {"type": "boolean"},
+            "revealed_secret": {"type": "string", "pattern": "^[0-9]{5,6}$"}
+          }
+        }
+      ]
+    },
+    "latest_sequence": {"type": "integer", "minimum": 0},
+    "available_actions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["start", "ready", "unready", "submit_guess", "leave", "request_rematch"]}
+    }
+  }
+}

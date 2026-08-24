@@ -11,10 +11,11 @@ Before any implementation task, read once:
 1. `README.md`
 2. `ROADMAP.md`
 3. `docs/product/game-design.md`
-4. `docs/architecture/overview.md`
-5. `docs/api/realtime-contract.md`
-6. the assigned task in `docs/execution/BACKEND-TASKS.md`
-7. every nearer `AGENTS.md` for files being changed
+4. `docs/product/phase-0-decisions.md`
+5. `docs/architecture/overview.md`
+6. `docs/api/realtime-contract.md`
+7. the assigned task in `docs/execution/BACKEND-TASKS.md`
+8. every nearer `AGENTS.md` for files being changed
 
 Read ADRs only when the task touches their decision. Do not repeatedly load
 unrelated documentation.

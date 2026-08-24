@@ -149,16 +149,13 @@ match_deadline_seconds
 attempt_limit
 ```
 
-Initial supported lengths are 4, 5, and 6. The Domain represents secrets and
-guesses as symbol sequences/strings, never integers.
+Official MVP lengths are 5 and 6. The Domain represents secrets and guesses as
+symbol sequences/strings, never integers. Both official presets allow duplicate
+digits with maximum repetition two; leading zero is disabled. Exact preset
+values are frozen in [the Phase 0 register](phase-0-decisions.md).
 
-Duplicate policy is finalized in T0 after a small gameplay prototype. Working
-candidate presets:
-
-- **Classic:** unique digits for clear onboarding.
-- **Brain Burner:** duplicates allowed, maximum two occurrences per digit.
-
-Unrestricted repetition remains a custom/experimental rule until playtested.
+Unrestricted repetition and unique-only play remain experimental/custom rules,
+not official MVP presets.
 
 ### Positional feedback
 
@@ -254,17 +251,9 @@ AI moderation may assist later but cannot be the authoritative core validator.
   non-color cues are required client concerns.
 - Invalid/success feedback must not depend only on animation or audio.
 
-## Phase 0 decision gate
+## Phase 0 status
 
-T0 is complete only after Product, Frontend, and Backend record:
-
-1. Number preset lengths, leading-zero and duplicate/max-repetition rules.
-2. Positional feedback confirmation and canonical duplicate examples.
-3. Default timer, attempt limit, history, reveal, tie-window, and win policy.
-4. Guest permissions and authentication market choice.
-5. Exact Social MVP scope and Color/Word ordering.
-6. Frontend stack/browser support and accessibility baseline.
-7. Retention and initial capacity targets.
-8. Named Product Owner/tie-breaker for future unresolved decisions.
-
-Until these are signed off, recommendations above remain working defaults.
+Backend-facing decisions are frozen in
+[the Phase 0 register](phase-0-decisions.md). Machine-readable contracts and
+canonical examples live under `contracts/`. Product changes must update the
+register, contract version, fixtures, and affected acceptance tests together.
