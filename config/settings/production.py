@@ -1,5 +1,7 @@
 """Fail-closed production settings."""
 
+from cryptography.fernet import Fernet
+
 from config.settings.base import *  # noqa: F403
 from config.settings.env import csv, fail, get
 
@@ -16,6 +18,11 @@ if not get("POSTGRES_PASSWORD"):
     fail("POSTGRES_PASSWORD is required in production")
 if not get("REDIS_URL"):
     fail("REDIS_URL is required in production")
+GAME_SECRET_ENCRYPTION_KEY = get("GAME_SECRET_ENCRYPTION_KEY", required=True)
+try:
+    Fernet(GAME_SECRET_ENCRYPTION_KEY.encode())
+except (ValueError, TypeError):
+    fail("GAME_SECRET_ENCRYPTION_KEY must be a URL-safe base64 Fernet key")
 
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True

@@ -151,6 +151,10 @@ Initial load, page refresh, reconnect, and event-gap recovery all use Snapshot.
 Initial stable codes include:
 
 ```text
+authentication_required
+permission_denied
+match_not_found
+invalid_request
 invalid_guess_length
 invalid_symbol
 leading_zero_not_allowed

@@ -1,4 +1,4 @@
 # Games boundary
 
-Will own immutable rules, presets and pure deterministic evaluators. T1 contains
-no rules, secrets, guesses, feedback, registry, model, serializer or endpoint.
+Owns the two frozen Number presets, validation, injectable secure generation,
+encrypted-secret adapter and duplicate-safe pure evaluator. It has no ORM model.

@@ -90,9 +90,23 @@ CHANNEL_LAYERS = {
 }
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["apps.accounts.authentication.GuestAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {
+        "guest_create": "20/hour",
+        "game_read": "120/minute",
+        "match_create": "30/hour",
+        "guess": "120/minute",
+        "snapshot": "120/minute",
+        "leave": "30/hour",
+    },
+    "EXCEPTION_HANDLER": "config.api_errors.exception_handler",
 }
+
+GAME_SECRET_ENCRYPTION_KEY = get("GAME_SECRET_ENCRYPTION_KEY", "")
 
 LOGGING = {
     "version": 1,

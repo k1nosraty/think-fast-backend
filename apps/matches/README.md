@@ -1,4 +1,5 @@
 # Matches boundary
 
-Will own match lifecycle, participants, attempts, results and application
-services. T1 intentionally creates no domain model or product API.
+T2 owns the Solo lifecycle, participant, protected challenge, immutable attempts,
+result, idempotent application services, projections and REST adapters. Rooms
+and multiplayer remain T3 scope.

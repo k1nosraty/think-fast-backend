@@ -5,9 +5,9 @@ Players solve number, color, and later word challenges in solo or realtime
 matches. The server owns rules, secrets, timing, accepted attempts, feedback,
 and results.
 
-Backend Tasks T0 and T1 are complete. MVP contracts are frozen at
-`v1.0.0-draft.1`; the reproducible Django engineering foundation is ready.
-Gameplay implementation has not started. The next task is T2.
+Backend Tasks T0–T2 are complete. MVP contracts are frozen at
+`v1.0.0-draft.1`; the reproducible Django foundation and Solo Number vertical
+slice are ready. Friendly rooms and realtime play have not started; next is T3.
 
 ## MVP
 
@@ -86,6 +86,25 @@ are not loaded implicitly; export/source them in your shell or use your process
 manager. The checked-in local defaults match Compose and contain no deployable
 secret. Start with `uv run python manage.py runserver`.
 
+### Exercise the Solo API
+
+Create a guest, then send its token as `Authorization: Bearer <token>`:
+
+```text
+POST /api/v1/guest-sessions/
+GET  /api/v1/game-definitions/
+POST /api/v1/solo-matches/
+POST /api/v1/matches/{match_id}/guesses/
+GET  /api/v1/matches/{match_id}/snapshot/
+POST /api/v1/matches/{match_id}/leave/
+```
+
+Create a local demo identity and active match after migrations:
+
+```bash
+uv run python manage.py seed_demo
+```
+
 ### Run every quality gate
 
 ```bash
@@ -98,13 +117,13 @@ contract validation, pytest and the 85% coverage threshold.
 ### Build the production image
 
 ```bash
-docker build --tag think-fast-backend:t1 .
+docker build --tag think-fast-backend:t2 .
 ```
 
 The image starts Daphne with `config.settings.production`. It refuses to boot
 unless `DJANGO_SECRET_KEY` is strong and `DJANGO_ALLOWED_HOSTS`,
-`POSTGRES_PASSWORD`, and `REDIS_URL` are explicit. Run migrations as a separate
-release step before application replicas.
+`POSTGRES_PASSWORD`, `REDIS_URL`, and `GAME_SECRET_ENCRYPTION_KEY` are explicit.
+Run migrations as a separate release step before application replicas.
 
 ## Foundation and contract assets
 

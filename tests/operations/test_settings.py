@@ -5,15 +5,21 @@ import sys
 from django.apps import apps
 
 
-def test_expected_boundaries_are_registered_without_domain_models() -> None:
-    for label in ("accounts", "games", "matches", "realtime"):
-        config = apps.get_app_config(label)
-        assert list(config.get_models()) == []
+def test_expected_boundaries_are_registered() -> None:
+    assert {
+        apps.get_app_config(label).name for label in ("accounts", "games", "matches", "realtime")
+    } == {"apps.accounts", "apps.games", "apps.matches", "apps.realtime"}
 
 
 def test_production_settings_refuse_missing_secrets() -> None:
     environment = os.environ.copy()
-    for name in ("DJANGO_SECRET_KEY", "DJANGO_ALLOWED_HOSTS", "POSTGRES_PASSWORD", "REDIS_URL"):
+    for name in (
+        "DJANGO_SECRET_KEY",
+        "DJANGO_ALLOWED_HOSTS",
+        "POSTGRES_PASSWORD",
+        "REDIS_URL",
+        "GAME_SECRET_ENCRYPTION_KEY",
+    ):
         environment.pop(name, None)
     completed = subprocess.run(
         [sys.executable, "-c", "import config.settings.production"],
@@ -34,6 +40,7 @@ def test_production_settings_accept_secure_explicit_configuration() -> None:
             "DJANGO_ALLOWED_HOSTS": "api.example.test",
             "POSTGRES_PASSWORD": "not-a-real-secret",
             "REDIS_URL": "redis://redis:6379/0",
+            "GAME_SECRET_ENCRYPTION_KEY": "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
         }
     )
     completed = subprocess.run(

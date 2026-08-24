@@ -79,6 +79,10 @@
             "description": "Solo match created",
             "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}
           },
+          "200": {
+            "description": "Existing Solo match returned for the same command ID",
+            "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}
+          },
           "400": {"$ref": "#/components/responses/ApiError"},
           "401": {"$ref": "#/components/responses/ApiError"},
           "409": {"$ref": "#/components/responses/ApiError"},
@@ -214,6 +218,8 @@
         "responses": {
           "200": {"description": "Updated viewer snapshot", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
           "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"},
           "409": {"$ref": "#/components/responses/ApiError"}
         }
       }

@@ -55,6 +55,9 @@ format/lint/types/Django/migrations/tests/contracts pass; no gameplay exists.
 
 **Effort:** Very high.
 
+**Status:** Complete on 2026-08-24. Solo Number is the only implemented gameplay
+flow. The next task is T3; do not add room/realtime behavior implicitly.
+
 - Implement immutable validated RuleSet snapshot with schema/evaluator version.
 - Implement secure injectable Secret generator and pure duplicate-safe evaluator.
 - Implement minimum guest identity, Match, Participant, Challenge/protected

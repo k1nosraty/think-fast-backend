@@ -7,6 +7,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
+  "cryptography==50.0.0",
   "django==5.2.17",
   "djangorestframework==3.18.0",
   "psycopg[binary]>=3.2.10,<4",
@@ -15,6 +16,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "django-stubs[compatible-mypy]>=5.2.7,<6",
+  "djangorestframework-stubs[compatible-mypy]>=3.16.6,<4",
   "mypy>=1.18.2,<2",
   "pre-commit>=4.3.0,<5",
   "pytest>=8.4.2,<9",
@@ -30,6 +32,7 @@ extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "DJ", "RUF"]
+ignore = ["DJ008", "RUF012"]
 
 [tool.mypy]
 python_version = "3.12"

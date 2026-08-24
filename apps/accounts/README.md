@@ -1,4 +1,4 @@
 # Accounts boundary
 
-Owns guest/account identity and authorization policy when T2 requests them.
-T1 intentionally defines no custom user, model, serializer, or endpoint.
+T2 provides a minimal 30-day sliding guest identity with a hashed bearer token.
+It deliberately does not add registration, passwords, OTP or account upgrade.
