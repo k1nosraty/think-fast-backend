@@ -17,5 +17,5 @@ must be reconstructible or safely disposable.
 
 ## Consequences
 
-Critical outcomes survive Redis loss. Realtime delivery needs snapshots,
-sequence numbers, and possibly a transactional outbox for reliable fan-out.
+Critical outcomes survive Redis loss. Realtime uses viewer-specific snapshots,
+monotonic sequences, and a transactional outbox with retryable delivery.

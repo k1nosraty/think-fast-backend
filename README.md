@@ -5,9 +5,9 @@ Players solve number, color, and later word challenges in solo or realtime
 matches. The server owns rules, secrets, timing, accepted attempts, feedback,
 and results.
 
-Backend Tasks T0–T3 are complete. MVP contracts are frozen at
+Backend Tasks T0–T4 are complete. MVP contracts are frozen at
 `v1.0.0-draft.1`; Solo Number and private realtime Friendly 1v1 are playable.
-Reliability/recovery hardening is the next task, T4.
+Durable delivery and recovery are implemented; rematch/playtest support is T5.
 
 ## MVP
 
@@ -115,6 +115,11 @@ Native clients may send `Authorization: Bearer <token>` in the WebSocket
 handshake. Browsers should request subprotocols `think-fast` and
 `bearer.<token>`; query-string tokens are rejected.
 
+Clients send `{"type":"resync","last_sequence":N}` after a detected gap.
+Stored authorized events after `N` are replayed in order. Duplicates are valid
+at-least-once delivery and must be ignored by sequence; an invalid cursor yields
+`system.resync_required`, after which the client fetches the HTTP Snapshot.
+
 Create a local demo identity and active match after migrations:
 
 ```bash
@@ -133,13 +138,18 @@ contract validation, pytest and the 85% coverage threshold.
 ### Build the production image
 
 ```bash
-docker build --tag think-fast-backend:t3 .
+docker build --tag think-fast-backend:t4 .
 ```
 
 The image starts Daphne with `config.settings.production`. It refuses to boot
 unless `DJANGO_SECRET_KEY` is strong and `DJANGO_ALLOWED_HOSTS`,
 `POSTGRES_PASSWORD`, `REDIS_URL`, and `GAME_SECRET_ENCRYPTION_KEY` are explicit.
 Run migrations as a separate release step before application replicas.
+
+Run `uv run python manage.py sweep_reliability --limit 100` at least once per
+second in a single scheduled worker. It converges persisted countdown/deadline
+and disconnect-grace state after process restarts and retries due outbox rows.
+`publish_outbox` is available when only delivery retry is desired.
 
 ## Foundation and contract assets
 

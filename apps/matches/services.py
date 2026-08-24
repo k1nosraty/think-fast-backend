@@ -378,20 +378,42 @@ def abandon(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
         return match
-    if match.state == Match.State.ACTIVE:
+    if match.state in {Match.State.COUNTDOWN, Match.State.ACTIVE, Match.State.FINISHING}:
         participant.solve_state = Participant.SolveState.ABANDONED
         participant.save(update_fields=["solve_state"])
         match.state = Match.State.ABANDONED
         match.finished_at = now
-        match.latest_sequence += 1
-        match.save(update_fields=["state", "finished_at", "latest_sequence"])
-        Result.objects.create(
+        match.finish_due_at = None
+        match.save(update_fields=["state", "finished_at", "finish_due_at"])
+        winner_ids = (
+            [
+                str(item)
+                for item in match.participants.exclude(pk=participant.pk).values_list(
+                    "id", flat=True
+                )
+            ]
+            if match.rules.get("match_mode") == "friendly"
+            else []
+        )
+        result = Result.objects.create(
             match=match,
             outcome="abandoned",
             reason="abandoned",
-            winner_participant_ids=[],
+            winner_participant_ids=winner_ids,
             secret_revealed=False,
         )
+        if match.rules.get("match_mode") == "friendly":
+            record_event(
+                match=match,
+                event_type="match.finished",
+                visibility="match",
+                payload={
+                    "outcome": result.outcome,
+                    "winner_participant_ids": winner_ids,
+                    "reason": result.reason,
+                    "secret_revealed": False,
+                },
+            )
     elif match.state != Match.State.ABANDONED:
         raise GameAPIError("match_not_active", "Only an active match can be abandoned.")
     CommandRecord.objects.create(

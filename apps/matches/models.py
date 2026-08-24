@@ -79,6 +79,10 @@ class Participant(models.Model):
     solve_state = models.CharField(max_length=20, choices=SolveState, default=SolveState.PLAYING)
     solved_at = models.DateTimeField(null=True, blank=True)
     connected = models.BooleanField(default=False)
+    primary_connection_id = models.UUIDField(null=True, blank=True, editable=False)
+    primary_channel_name = models.CharField(max_length=255, blank=True)
+    disconnected_at = models.DateTimeField(null=True, blank=True)
+    grace_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -155,6 +159,10 @@ class MatchEvent(models.Model):
     participant = models.ForeignKey(Participant, on_delete=models.CASCADE, null=True, blank=True)
     payload = models.JSONField(default=dict)
     occurred_at = models.DateTimeField()
+    published_at = models.DateTimeField(null=True, blank=True)
+    publish_attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
 
     class Meta:
         constraints = [
@@ -172,6 +180,10 @@ class RoomEvent(models.Model):
     event_type = models.CharField(max_length=50)
     payload = models.JSONField(default=dict)
     occurred_at = models.DateTimeField()
+    published_at = models.DateTimeField(null=True, blank=True)
+    publish_attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
 
     class Meta:
         constraints = [

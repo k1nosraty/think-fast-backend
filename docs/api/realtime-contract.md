@@ -120,6 +120,18 @@ Persisted match sequence is monotonic. Delivery may be duplicated or delayed;
 clients ignore an already-applied sequence and fetch Snapshot on an unexplained
 gap. Event delivery is not the source of truth.
 
+For a recoverable gap, an authorized client may first send:
+
+```json
+{"type": "resync", "last_sequence": 17}
+```
+
+The server replays all viewer-authorized stored events after sequence 17 in
+order. A duplicate is ignored client-side. An invalid cursor returns
+`system.resync_required`; a missing/pruned history in a future retention policy
+must do the same, and the client then fetches Snapshot. Reconnect never pauses
+the persisted deadline.
+
 Room events use `room_id` and a monotonic sequence scoped to the Room. Match
 events use `match_id` and a monotonic sequence scoped to the Match. They never
 share one sequence space.
@@ -188,8 +200,11 @@ message text.
 - HTTP and WebSocket authenticate the same identity and enforce match membership.
 - Room codes locate rooms but are not authorization after join.
 - WebSocket subscription is denied before group membership when unauthorized.
-- One primary gameplay connection per participant/match is the working default;
-  T0 freezes replacement behavior.
+- One primary gameplay connection exists per participant/match. A newer socket
+  atomically replaces and closes the older socket. Disconnect starts the
+  configured 30-second grace while the match timer continues; reconnect clears
+  it, and expiry durably abandons the participant/match without revealing the
+  secret.
 
 ## Contract workflow
 

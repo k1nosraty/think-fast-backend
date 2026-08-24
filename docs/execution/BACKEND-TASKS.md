@@ -95,6 +95,10 @@ crosses participants; schemas/fixtures stay current.
 
 **Effort:** Very high.
 
+**Status:** Complete on 2026-08-24. Durable outbox delivery, gameplay connection
+replacement, grace/abandonment, ordered resync and restart convergence are
+implemented. The next task is T5; do not add rematch/analytics implicitly.
+
 - Audit every mutation for database constraint, atomic transition/locking,
   idempotency lifetime/conflict and post-commit publication.
 - Add transactional outbox/durable ordered delivery where required, not full

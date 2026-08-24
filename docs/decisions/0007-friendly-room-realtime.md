@@ -1,6 +1,6 @@
 # ADR 0007 — Friendly Room, tie finalization and realtime projection
 
-**Status:** Accepted in T3 on 2026-08-24
+**Status:** Accepted in T3; reliability addendum accepted in T4 on 2026-08-24
 
 ## Decision
 
@@ -25,8 +25,15 @@
   or browser subprotocol. Query-string tokens are intentionally unsupported so
   credentials do not enter URL logs or browsing history.
 
-## Consequences
+## T4 reliability addendum
 
-T3 provides ordered persisted events and safe post-commit fan-out, but not the
-durable outbox retry, event-gap protocol, connection replacement, disconnect
-grace, Redis disruption recovery or process-restart proofs owned by T4.
+- Event delivery is an at-least-once transactional outbox. A successful database
+  commit remains authoritative during Redis failure; retry metadata is durable.
+- One gameplay connection is primary. A new connection replaces the old one;
+  stale disconnect callbacks cannot disconnect the replacement.
+- Disconnect starts a configurable 30-second grace without pausing the deadline.
+  Reconnect clears it; durable expiry abandons without revealing the Secret.
+- Clients ignore duplicate sequences, request ordered authorized replay for
+  gaps, and fetch Snapshot when `system.resync_required` is returned.
+- A periodic database-backed sweep converges countdown, tie/deadline, grace and
+  pending delivery state after process restart.

@@ -65,8 +65,8 @@ not sufficient.
 
 - Serializers validate transport shape; use cases decide behavior.
 - Consumers deliver/authorize and never calculate game outcomes.
-- Publish only after commit, preferably through a transactional outbox once T4
-  reliability requires it.
+- Persist Room/Match events in the authoritative transaction and publish only
+  after commit through the durable retryable outbox.
 - Snapshot is viewer-specific recovery truth; events are incremental updates.
 - Public/private event projections are distinct types/functions, not a flag on a
   generic serializer.
