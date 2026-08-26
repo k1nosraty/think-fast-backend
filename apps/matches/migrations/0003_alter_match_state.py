@@ -4,15 +4,24 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('matches', '0002_match_finish_due_at_participant_connected_and_more'),
+        ("matches", "0002_match_finish_due_at_participant_connected_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='match',
-            name='state',
-            field=models.CharField(choices=[('countdown', 'Countdown'), ('active', 'Active'), ('finishing', 'Finishing'), ('finished', 'Finished'), ('abandoned', 'Abandoned')], default='active', max_length=20),
+            model_name="match",
+            name="state",
+            field=models.CharField(
+                choices=[
+                    ("countdown", "Countdown"),
+                    ("active", "Active"),
+                    ("finishing", "Finishing"),
+                    ("finished", "Finished"),
+                    ("abandoned", "Abandoned"),
+                ],
+                default="active",
+                max_length=20,
+            ),
         ),
     ]

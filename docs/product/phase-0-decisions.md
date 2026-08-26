@@ -18,7 +18,7 @@ through a recorded, versioned decision and compatible contract/preset update.
 | Friendly challenge | Same server-generated Secret for both players |
 | Room capacity | Exactly two active players in Social MVP |
 | History | Full accepted Guess history visible to its owner |
-| Later | Color, player-authored Challenge, Word, Ranked, team/tournament |
+| Expansion | Color Classic/Permutation in T6; player-authored Challenge and Word after T6 |
 
 ## Number presets
 
@@ -54,6 +54,20 @@ experiment, not an official MVP preset.
 
 Canonical duplicate examples live in
 `contracts/fixtures/number-feedback-cases.json` and are part of the contract.
+
+## T6 Color presets
+
+| Field | Color Classic 5 | Color Permutation 8 |
+| --- | --- | --- |
+| Preset ID | `color_classic_5_v1` | `color_permutation_8_v1` |
+| Palette/length | 12 / 5 | fixed 8 / 8 |
+| Duplicates | Yes, maximum 2 | No; exact permutation |
+| Feedback | aggregate exact/present | exact count only |
+| History | full | last 1 |
+| Deadline / Attempts | 180s / 12 | 240s / 15 |
+
+Color Guess and authorized reveal use arrays of stable `color_id`; every palette
+entry also publishes a label, shape and pattern for accessibility.
 
 ## Timing, result, and reveal
 

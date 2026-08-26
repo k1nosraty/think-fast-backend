@@ -55,7 +55,12 @@
         "properties": {
           "attempt_id": {"type": "string", "format": "uuid"},
           "ordinal": {"type": "integer", "minimum": 1},
-          "guess": {"type": "string", "pattern": "^[0-9]{5,6}$"},
+          "guess": {
+            "oneOf": [
+              {"type": "string", "pattern": "^[0-9]{5,6}$"},
+              {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+            ]
+          },
           "feedback": {"$ref": "feedback.schema.json"},
           "accepted_at": {"type": "string", "format": "date-time"},
           "solved": {"type": "boolean"}
@@ -74,7 +79,12 @@
             "winner_participant_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}},
             "reason": {"enum": ["solved", "deadline", "attempt_limit", "abandoned", "voided"]},
             "secret_revealed": {"type": "boolean"},
-            "revealed_secret": {"type": "string", "pattern": "^[0-9]{5,6}$"}
+            "revealed_secret": {
+              "oneOf": [
+                {"type": "string", "pattern": "^[0-9]{5,6}$"},
+                {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+              ]
+            }
           }
         }
       ]

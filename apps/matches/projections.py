@@ -3,6 +3,7 @@ from datetime import datetime
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
+from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.models import Match, Participant
@@ -21,6 +22,14 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             "permission_denied", "You are not a participant in this match.", status_code=403
         )
     match.refresh_from_db()
+    rules = rules_from_snapshot(match.rules)
+    history = rules.history_policy
+    attempt_rows = list(participant.attempts.all())
+    if history.get("type") == "last_n":
+        count = history.get("count", 1)
+        attempt_rows = attempt_rows[-(count if isinstance(count, int) else 1) :]
+    elif history.get("type") == "none":
+        attempt_rows = []
     attempts = [
         {
             "attempt_id": str(item.id),
@@ -30,7 +39,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             "accepted_at": iso(item.accepted_at),
             "solved": item.solved,
         }
-        for item in participant.attempts.all()
+        for item in attempt_rows
     ]
     result = None
     if hasattr(match, "result"):
@@ -44,7 +53,9 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             "secret_revealed": match.result.secret_revealed,
         }
         if match.result.secret_revealed:
-            result["revealed_secret"] = decrypt_secret(match.challenge.protected_secret)
+            result["revealed_secret"] = adapter_for(rules.game_type).decode_secret(
+                rules, decrypt_secret(match.challenge.protected_secret)
+            )
     actions = ["submit_guess", "leave"] if match.state == Match.State.ACTIVE else []
     if match.room_id and match.state in {Match.State.FINISHED, Match.State.ABANDONED}:
         actions.append("request_rematch")

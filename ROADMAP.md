@@ -14,7 +14,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T3 | Private room and realtime 1v1 | **Complete** — two guests play a shared-secret match |
 | T4 | Reliability and recovery | **Complete** — retry, deadlines, resync, restart, and reconnect are safe |
 | T5 | Rematch and gameplay polish | **Complete** — play-rematch loop and safe playtest analytics |
-| T6 | Color expansion | Color Classic and Permutation use the shared match platform |
+| T6 | Color expansion | **Complete** — Color Classic and Permutation use the shared match platform |
 | T7 | Challenge expansion | Player-authored duel plus a bounded Word feasibility spike |
 | T8 | Production beta | Secure, observable, load-tested staged release |
 | T9 | Competitive product | Ranked/matchmaking/progression only after MVP evidence |

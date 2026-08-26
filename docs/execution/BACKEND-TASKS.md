@@ -137,6 +137,11 @@ remain auditable.
 
 **Effort:** High.
 
+**Status:** Complete on 2026-08-26. Versioned palettes/presets, both pure Color
+evaluators, the explicit game registry, JSON Guess storage and Solo/Friendly
+flows are implemented. The next task is T7; do not add player-authored or Word
+behavior implicitly.
+
 - Freeze and publish Color palette metadata, validation, feedback tagged unions,
   presets and canonical fixtures before implementation.
 - Implement pure Color validators/evaluators and explicit registry entry.

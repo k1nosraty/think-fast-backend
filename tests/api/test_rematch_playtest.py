@@ -33,7 +33,7 @@ def test_full_rematch_creates_fresh_match_without_stale_private_state() -> None:
     assert requested.data == retry.data
     assert requested.data["rematch"]["state"] == "pending"
 
-    with patch("apps.matches.rooms.generate_number_secret", return_value="54321"):
+    with patch("apps.games.registry.generate_number_secret", return_value="54321"):
         accepted = opponent.post(f"/api/v1/matches/{source.id}/rematch/", command(), format="json")
     assert accepted.status_code == 202
     assert accepted.data["rematch"]["state"] == "accepted"

@@ -6,25 +6,71 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0001_initial'),
-        ('matches', '0005_matchevent_last_error_matchevent_next_attempt_at_and_more'),
+        ("accounts", "0001_initial"),
+        ("matches", "0005_matchevent_last_error_matchevent_next_attempt_at_and_more"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='RematchProposal',
+            name="RematchProposal",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('state', models.CharField(choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('declined', 'Declined'), ('expired', 'Expired')], default='pending', max_length=20)),
-                ('expires_at', models.DateTimeField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('new_match', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='accepted_rematch', to='matches.match')),
-                ('requester', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='rematch_requests', to='accounts.guestidentity')),
-                ('room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='rematch_proposals', to='matches.room')),
-                ('source_match', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='rematch_proposal', to='matches.match')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "state",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("accepted", "Accepted"),
+                            ("declined", "Declined"),
+                            ("expired", "Expired"),
+                        ],
+                        default="pending",
+                        max_length=20,
+                    ),
+                ),
+                ("expires_at", models.DateTimeField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "new_match",
+                    models.OneToOneField(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="accepted_rematch",
+                        to="matches.match",
+                    ),
+                ),
+                (
+                    "requester",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="rematch_requests",
+                        to="accounts.guestidentity",
+                    ),
+                ),
+                (
+                    "room",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="rematch_proposals",
+                        to="matches.room",
+                    ),
+                ),
+                (
+                    "source_match",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="rematch_proposal",
+                        to="matches.match",
+                    ),
+                ),
             ],
         ),
     ]

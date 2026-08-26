@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from apps.games.domain import PRESETS, GuessValidationError, evaluate_number, validate_sequence
+from apps.games.domain import (
+    NUMBER_PRESETS,
+    GuessValidationError,
+    evaluate_number,
+    validate_sequence,
+)
 from apps.games.secrets import generate_number_secret
 
 
@@ -14,7 +19,7 @@ def test_canonical_feedback_matrix() -> None:
         ).read_text()
     )["cases"]
     for case in cases:
-        rules = PRESETS[case["preset_id"]]
+        rules = NUMBER_PRESETS[case["preset_id"]]
         if case["valid"]:
             positions, solved = evaluate_number(
                 rules=rules, secret=case["secret"], guess=case["guess"]
@@ -37,10 +42,12 @@ def test_canonical_feedback_matrix() -> None:
 )
 def test_guess_validation_errors(guess: str, code: str) -> None:
     with pytest.raises(GuessValidationError, match=code):
-        validate_sequence(guess, PRESETS["number_classic_5_v1"])
+        validate_sequence(guess, NUMBER_PRESETS["number_classic_5_v1"])
 
 
 def test_generator_is_injectable_and_obeys_repetition_cap() -> None:
     values = iter("112345")
-    secret = generate_number_secret(PRESETS["number_classic_5_v1"], choice=lambda _: next(values))
+    secret = generate_number_secret(
+        NUMBER_PRESETS["number_classic_5_v1"], choice=lambda _: next(values)
+    )
     assert secret == "11234"

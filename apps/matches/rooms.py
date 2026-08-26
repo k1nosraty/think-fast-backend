@@ -10,8 +10,9 @@ from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
 from apps.analytics.service import record_analytics
-from apps.games.domain import NumberRules, rules_for_mode
-from apps.games.secrets import encrypt_secret, generate_number_secret
+from apps.games.domain import rules_for_mode
+from apps.games.registry import Rules, adapter_for
+from apps.games.secrets import encrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.models import (
     Challenge,
@@ -78,7 +79,7 @@ def _create_friendly_match(
     *,
     room: Room,
     members: list[RoomMembership],
-    secret_factory: Callable[[NumberRules], str] | None = None,
+    secret_factory: Callable[[Rules], object] | None = None,
 ) -> Match:
     rules = rules_for_mode(room.preset_id, "friendly")
     assert rules is not None
@@ -100,8 +101,11 @@ def _create_friendly_match(
             avatar_id=member.avatar_id,
             connected=member.connected,
         )
-    factory = secret_factory or generate_number_secret
-    Challenge.objects.create(match=match, protected_secret=encrypt_secret(factory(rules)))
+    adapter = adapter_for(rules.game_type)
+    secret = secret_factory(rules) if secret_factory else adapter.generate_secret(rules)
+    Challenge.objects.create(
+        match=match, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
+    )
     room.state = Room.State.ACTIVE
     room.save(update_fields=["state", "updated_at"])
     record_event(
@@ -285,7 +289,7 @@ def start_room(
     guest: GuestIdentity,
     room_id: uuid.UUID,
     command_id: uuid.UUID,
-    secret_factory: Callable[[NumberRules], str] | None = None,
+    secret_factory: Callable[[Rules], object] | None = None,
 ) -> tuple[Match, bool]:
     room = Room.objects.select_for_update().filter(pk=room_id).first()
     if room is None:

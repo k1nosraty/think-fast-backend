@@ -1,4 +1,6 @@
 # Games boundary
 
-Owns the two frozen Number presets, validation, injectable secure generation,
-encrypted-secret adapter and duplicate-safe pure evaluator. It has no ORM model.
+Owns versioned Number and Color presets, palette metadata, validation,
+injectable secure generation and pure evaluators. `registry.py` is the narrow
+explicit adapter map used by Match orchestration; do not replace it with a
+generic plugin framework. This app has no ORM model.

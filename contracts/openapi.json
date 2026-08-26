@@ -68,7 +68,7 @@
                 "required": ["command_id", "preset_id"],
                 "properties": {
                   "command_id": {"type": "string", "format": "uuid"},
-                  "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1"]}
+                  "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1", "color_classic_5_v1", "color_permutation_8_v1"]}
                 }
               }
             }
@@ -338,7 +338,7 @@
         "required": ["command_id", "preset_id"],
         "properties": {
           "command_id": {"type": "string", "format": "uuid"},
-          "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1"]}
+          "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1", "color_classic_5_v1", "color_permutation_8_v1"]}
         }
       },
       "RoomSnapshot": {

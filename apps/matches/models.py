@@ -102,7 +102,7 @@ class Attempt(models.Model):
     command_id = models.UUIDField()
     request_fingerprint = models.CharField(max_length=64)
     ordinal = models.PositiveIntegerField()
-    guess = models.CharField(max_length=6)
+    guess = models.JSONField()
     feedback = models.JSONField()
     solved = models.BooleanField(default=False)
     accepted_at = models.DateTimeField()

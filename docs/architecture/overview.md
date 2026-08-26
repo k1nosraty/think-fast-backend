@@ -27,6 +27,10 @@ and operational cost before providing useful isolation.
 Domain evaluation must not import Django, access the database, publish events,
 or read wall-clock time.
 
+Game-specific validation/generation/evaluation is selected through a small
+explicit registry keyed by `game_type`. Adapters expose one narrow contract;
+Match lifecycle remains shared and contains no growing game-type conditional.
+
 ## Core interaction: submit guess
 
 1. Authenticate participant and validate command/idempotency key.

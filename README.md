@@ -5,10 +5,10 @@ Players solve number, color, and later word challenges in solo or realtime
 matches. The server owns rules, secrets, timing, accepted attempts, feedback,
 and results.
 
-Backend Tasks T0–T5 are complete. MVP contracts are frozen at
+Backend Tasks T0–T6 are complete. MVP contracts are frozen at
 `v1.0.0-draft.1`; Solo Number and private realtime Friendly 1v1 are playable.
-The full Room-to-rematch loop and safe playtest analytics are implemented;
-Color expansion is the next task, T6.
+The Room-to-rematch loop, safe playtest analytics, Color Classic and Color
+Permutation are implemented; player-authored challenges/Word spike are T7.
 
 ## MVP
 
@@ -22,8 +22,8 @@ The implementation baseline is deliberately narrow:
 - room, ready, countdown, realtime progress, reconnect, result, and rematch;
 - REST commands/snapshots plus versioned WebSocket events.
 
-Color variants follow after the 1v1 core is reliable. Player-authored duels and
-Word are explicit expansion work, not prerequisites for the first playable MVP.
+Player-authored duels and Word are explicit expansion work, not prerequisites
+for the first playable MVP.
 Ranked, teams, tournaments, chat, monetization, and microservices are later.
 
 ## Read this first
@@ -141,7 +141,7 @@ contract validation, pytest and the 85% coverage threshold.
 ### Build the production image
 
 ```bash
-docker build --tag think-fast-backend:t5 .
+docker build --tag think-fast-backend:t6 .
 ```
 
 The image starts Daphne with `config.settings.production`. It refuses to boot

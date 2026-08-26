@@ -4,70 +4,69 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('matches', '0004_room_latest_sequence_roomevent'),
+        ("matches", "0004_room_latest_sequence_roomevent"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='matchevent',
-            name='last_error',
+            model_name="matchevent",
+            name="last_error",
             field=models.CharField(blank=True, max_length=500),
         ),
         migrations.AddField(
-            model_name='matchevent',
-            name='next_attempt_at',
+            model_name="matchevent",
+            name="next_attempt_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='matchevent',
-            name='publish_attempts',
+            model_name="matchevent",
+            name="publish_attempts",
             field=models.PositiveIntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='matchevent',
-            name='published_at',
+            model_name="matchevent",
+            name="published_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='participant',
-            name='disconnected_at',
+            model_name="participant",
+            name="disconnected_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='participant',
-            name='grace_expires_at',
+            model_name="participant",
+            name="grace_expires_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='participant',
-            name='primary_channel_name',
+            model_name="participant",
+            name="primary_channel_name",
             field=models.CharField(blank=True, max_length=255),
         ),
         migrations.AddField(
-            model_name='participant',
-            name='primary_connection_id',
+            model_name="participant",
+            name="primary_connection_id",
             field=models.UUIDField(blank=True, editable=False, null=True),
         ),
         migrations.AddField(
-            model_name='roomevent',
-            name='last_error',
+            model_name="roomevent",
+            name="last_error",
             field=models.CharField(blank=True, max_length=500),
         ),
         migrations.AddField(
-            model_name='roomevent',
-            name='next_attempt_at',
+            model_name="roomevent",
+            name="next_attempt_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='roomevent',
-            name='publish_attempts',
+            model_name="roomevent",
+            name="publish_attempts",
             field=models.PositiveIntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='roomevent',
-            name='published_at',
+            model_name="roomevent",
+            name="published_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
     ]

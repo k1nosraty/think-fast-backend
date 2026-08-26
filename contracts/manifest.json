@@ -7,9 +7,13 @@
     {"path": "fixtures/events/guess-evaluated.json", "schema": "schemas/event.schema.json"},
     {"path": "fixtures/events/room-ready-changed.json", "schema": "schemas/event.schema.json"},
     {"path": "fixtures/events/rematch-accepted.json", "schema": "schemas/event.schema.json"},
+    {"path": "fixtures/events/color-permutation-evaluated.json", "schema": "schemas/event.schema.json"},
     {"path": "fixtures/snapshots/solo-active.json", "schema": "schemas/snapshot.schema.json"},
     {"path": "fixtures/snapshots/friendly-active.json", "schema": "schemas/snapshot.schema.json"},
     {"path": "fixtures/requests/submit-guess.json", "schema": "schemas/guess-command.schema.json"},
+    {"path": "fixtures/requests/submit-color-guess.json", "schema": "schemas/guess-command.schema.json"},
+    {"path": "fixtures/rules/color-classic-5.json", "schema": "schemas/ruleset.schema.json"},
+    {"path": "fixtures/rules/color-permutation-8.json", "schema": "schemas/ruleset.schema.json"},
     {"path": "fixtures/number-feedback-cases.json", "schema": "schemas/number-feedback-cases.schema.json"}
   ]
 }

@@ -6,87 +6,182 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0001_initial'),
-        ('matches', '0001_initial'),
+        ("accounts", "0001_initial"),
+        ("matches", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='match',
-            name='finish_due_at',
+            model_name="match",
+            name="finish_due_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='participant',
-            name='connected',
+            model_name="participant",
+            name="connected",
             field=models.BooleanField(default=False),
         ),
         migrations.AlterField(
-            model_name='commandrecord',
-            name='match',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='commands', to='matches.match'),
+            model_name="commandrecord",
+            name="match",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="commands",
+                to="matches.match",
+            ),
         ),
         migrations.AlterField(
-            model_name='match',
-            name='state',
-            field=models.CharField(choices=[('active', 'Active'), ('finishing', 'Finishing'), ('finished', 'Finished'), ('abandoned', 'Abandoned')], default='active', max_length=20),
+            model_name="match",
+            name="state",
+            field=models.CharField(
+                choices=[
+                    ("active", "Active"),
+                    ("finishing", "Finishing"),
+                    ("finished", "Finished"),
+                    ("abandoned", "Abandoned"),
+                ],
+                default="active",
+                max_length=20,
+            ),
         ),
         migrations.CreateModel(
-            name='Room',
+            name="Room",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('join_code', models.CharField(max_length=6, unique=True)),
-                ('preset_id', models.CharField(max_length=50)),
-                ('state', models.CharField(choices=[('waiting', 'Waiting'), ('ready_check', 'Ready Check'), ('active', 'Active'), ('closed', 'Closed')], default='waiting', max_length=20)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('host', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='hosted_rooms', to='accounts.guestidentity')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("join_code", models.CharField(max_length=6, unique=True)),
+                ("preset_id", models.CharField(max_length=50)),
+                (
+                    "state",
+                    models.CharField(
+                        choices=[
+                            ("waiting", "Waiting"),
+                            ("ready_check", "Ready Check"),
+                            ("active", "Active"),
+                            ("closed", "Closed"),
+                        ],
+                        default="waiting",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "host",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="hosted_rooms",
+                        to="accounts.guestidentity",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='commandrecord',
-            name='room',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='commands', to='matches.room'),
+            model_name="commandrecord",
+            name="room",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="commands",
+                to="matches.room",
+            ),
         ),
         migrations.AddField(
-            model_name='match',
-            name='room',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='matches', to='matches.room'),
+            model_name="match",
+            name="room",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="matches",
+                to="matches.room",
+            ),
         ),
         migrations.CreateModel(
-            name='MatchEvent',
+            name="MatchEvent",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('sequence', models.PositiveIntegerField()),
-                ('event_type', models.CharField(max_length=50)),
-                ('visibility', models.CharField(max_length=20)),
-                ('payload', models.JSONField(default=dict)),
-                ('occurred_at', models.DateTimeField()),
-                ('match', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='events', to='matches.match')),
-                ('participant', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='matches.participant')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("sequence", models.PositiveIntegerField()),
+                ("event_type", models.CharField(max_length=50)),
+                ("visibility", models.CharField(max_length=20)),
+                ("payload", models.JSONField(default=dict)),
+                ("occurred_at", models.DateTimeField()),
+                (
+                    "match",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="events",
+                        to="matches.match",
+                    ),
+                ),
+                (
+                    "participant",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="matches.participant",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['sequence'],
-                'constraints': [models.UniqueConstraint(fields=('match', 'sequence'), name='unique_match_event_sequence')],
+                "ordering": ["sequence"],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("match", "sequence"), name="unique_match_event_sequence"
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='RoomMembership',
+            name="RoomMembership",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('display_name', models.CharField(max_length=20)),
-                ('avatar_id', models.CharField(max_length=50)),
-                ('ready', models.BooleanField(default=False)),
-                ('connected', models.BooleanField(default=False)),
-                ('joined_at', models.DateTimeField(auto_now_add=True)),
-                ('guest', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='room_memberships', to='accounts.guestidentity')),
-                ('room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='memberships', to='matches.room')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("display_name", models.CharField(max_length=20)),
+                ("avatar_id", models.CharField(max_length=50)),
+                ("ready", models.BooleanField(default=False)),
+                ("connected", models.BooleanField(default=False)),
+                ("joined_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "guest",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="room_memberships",
+                        to="accounts.guestidentity",
+                    ),
+                ),
+                (
+                    "room",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="memberships",
+                        to="matches.room",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['joined_at', 'id'],
-                'constraints': [models.UniqueConstraint(fields=('room', 'guest'), name='unique_room_guest')],
+                "ordering": ["joined_at", "id"],
+                "constraints": [
+                    models.UniqueConstraint(fields=("room", "guest"), name="unique_room_guest")
+                ],
             },
         ),
     ]

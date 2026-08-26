@@ -83,6 +83,12 @@ Permutation feedback:
 Clients must switch on `kind`; fields from one variant are not silently reused
 for another.
 
+Number Guess remains a fixed-width digit string. Color Guess is an ordered JSON
+array of stable `color_id` values. Color Classic uses positional or aggregate
+feedback according to its frozen RuleSet; Color Permutation exposes only
+`exact_count`. Palette definitions in the RuleSet include hex, localization
+key, shape and pattern, and clients must not communicate meaning by color alone.
+
 ## Event envelope
 
 ```json
@@ -188,6 +194,7 @@ invalid_symbol
 leading_zero_not_allowed
 duplicate_not_allowed
 repetition_limit_exceeded
+invalid_permutation
 match_not_active
 deadline_elapsed
 attempt_limit_reached

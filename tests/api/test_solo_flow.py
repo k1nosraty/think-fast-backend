@@ -24,7 +24,7 @@ def authorize(client: APIClient, token: str) -> None:
 
 
 def create_match(client: APIClient, secret: str = "12345") -> dict:
-    with patch("apps.matches.services.generate_number_secret", return_value=secret):
+    with patch("apps.games.registry.generate_number_secret", return_value=secret):
         response = client.post(
             "/api/v1/solo-matches/",
             {"command_id": str(uuid.uuid4()), "preset_id": "number_classic_5_v1"},
@@ -204,6 +204,8 @@ def test_game_definitions_match_frozen_presets() -> None:
     assert {item["preset_id"] for item in response.data["definitions"]} == {
         "number_classic_5_v1",
         "number_brain_burner_6_v1",
+        "color_classic_5_v1",
+        "color_permutation_8_v1",
     }
 
 
@@ -214,7 +216,7 @@ def test_create_match_command_is_idempotent_and_conflicts_on_changed_payload() -
     authorize(client, token)
     command = str(uuid.uuid4())
     payload = {"command_id": command, "preset_id": "number_classic_5_v1"}
-    with patch("apps.matches.services.generate_number_secret", return_value="12345"):
+    with patch("apps.games.registry.generate_number_secret", return_value="12345"):
         first = client.post("/api/v1/solo-matches/", payload, format="json")
         retry = client.post("/api/v1/solo-matches/", payload, format="json")
         conflict = client.post(

@@ -37,7 +37,7 @@ def active_match() -> tuple[APIClient, APIClient, dict]:
     assert joined.status_code == 200
     ready(host, room["room_id"])
     ready(opponent, room["room_id"])
-    with patch("apps.matches.rooms.generate_number_secret", return_value="12345"):
+    with patch("apps.games.registry.generate_number_secret", return_value="12345"):
         response = host.post(f"/api/v1/rooms/{room['room_id']}/start/", command(), format="json")
     assert response.status_code == 201
     return host, opponent, response.data
@@ -63,7 +63,7 @@ def test_room_capacity_ready_host_permission_and_participant_freeze() -> None:
     forbidden = opponent.post(f"/api/v1/rooms/{room_id}/start/", command(), format="json")
     assert forbidden.status_code == 403
     assert forbidden.data["code"] == "not_room_host"
-    with patch("apps.matches.rooms.generate_number_secret", return_value="12345"):
+    with patch("apps.games.registry.generate_number_secret", return_value="12345"):
         started = host.post(f"/api/v1/rooms/{room_id}/start/", command(), format="json")
     assert started.status_code == 201
     assert started.data["rules"]["match_mode"] == "friendly"
@@ -132,7 +132,7 @@ def test_production_countdown_activates_idempotently() -> None:
     opponent.post(f"/api/v1/rooms/{room['room_id']}/join/", command(), format="json")
     ready(host, room["room_id"])
     ready(opponent, room["room_id"])
-    with patch("apps.matches.rooms.generate_number_secret", return_value="12345"):
+    with patch("apps.games.registry.generate_number_secret", return_value="12345"):
         started = host.post(f"/api/v1/rooms/{room['room_id']}/start/", command(), format="json")
     match = Match.objects.get(pk=started.data["match_id"])
     assert started.data["state"] == match.state == "countdown"

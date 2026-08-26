@@ -10,7 +10,7 @@
       "enum": [
         "authentication_required", "permission_denied", "match_not_found", "invalid_request",
         "invalid_guess_length", "invalid_symbol", "leading_zero_not_allowed", "duplicate_not_allowed",
-        "repetition_limit_exceeded", "match_not_active", "deadline_elapsed",
+        "repetition_limit_exceeded", "invalid_permutation", "match_not_active", "deadline_elapsed",
         "attempt_limit_reached", "room_not_found", "room_full",
         "not_room_host", "not_ready", "idempotency_conflict", "rate_limited",
         "resync_required", "client_version_unsupported"

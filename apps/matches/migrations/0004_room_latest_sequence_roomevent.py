@@ -6,30 +6,45 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('matches', '0003_alter_match_state'),
+        ("matches", "0003_alter_match_state"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='room',
-            name='latest_sequence',
+            model_name="room",
+            name="latest_sequence",
             field=models.PositiveIntegerField(default=0),
         ),
         migrations.CreateModel(
-            name='RoomEvent',
+            name="RoomEvent",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('sequence', models.PositiveIntegerField()),
-                ('event_type', models.CharField(max_length=50)),
-                ('payload', models.JSONField(default=dict)),
-                ('occurred_at', models.DateTimeField()),
-                ('room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='events', to='matches.room')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("sequence", models.PositiveIntegerField()),
+                ("event_type", models.CharField(max_length=50)),
+                ("payload", models.JSONField(default=dict)),
+                ("occurred_at", models.DateTimeField()),
+                (
+                    "room",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="events",
+                        to="matches.room",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['sequence'],
-                'constraints': [models.UniqueConstraint(fields=('room', 'sequence'), name='unique_room_event_sequence')],
+                "ordering": ["sequence"],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("room", "sequence"), name="unique_room_event_sequence"
+                    )
+                ],
             },
         ),
     ]

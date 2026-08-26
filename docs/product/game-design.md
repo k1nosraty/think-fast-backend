@@ -200,6 +200,8 @@ theme values are presentation metadata.
 - configurable palette size and sequence length;
 - duplicate-safe exact/present/absent evaluation;
 - feedback may be positional or aggregate as an explicit policy.
+- Official `color_classic_5_v1` uses 12 published colors, length 5, maximum
+  repetition 2, aggregate feedback, full history, 180 seconds and 12 Attempts.
 
 ### Color Permutation
 
@@ -207,6 +209,8 @@ theme values are presentation metadata.
 - every Guess must be a permutation of exactly that set;
 - feedback returns only `exact_count` and never correct positions;
 - default history is `last_n(1)`; `none` is a harder preset.
+- Official `color_permutation_8_v1` uses the first 8 published palette entries,
+  240 seconds and 15 Attempts.
 
 "Hidden/Mystery Palette" is later. Do not call it "Blind" because that conflicts
 with accessibility terminology.

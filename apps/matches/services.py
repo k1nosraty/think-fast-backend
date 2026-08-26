@@ -2,7 +2,6 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable
-from dataclasses import fields
 from datetime import datetime, timedelta
 
 from django.db import transaction
@@ -10,14 +9,10 @@ from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
 from apps.analytics.service import record_analytics
-from apps.games.domain import (
-    PRESETS,
-    GuessValidationError,
-    NumberRules,
-    evaluate_number,
-    validate_sequence,
-)
-from apps.games.secrets import decrypt_secret, encrypt_secret, generate_number_secret
+from apps.games.color import ColorValidationError
+from apps.games.domain import PRESETS, GuessValidationError
+from apps.games.registry import Rules, adapter_for, rules_from_snapshot
+from apps.games.secrets import decrypt_secret, encrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.models import (
     Attempt,
@@ -38,17 +33,13 @@ def fingerprint(payload: dict[str, object]) -> str:
     ).hexdigest()
 
 
-def rules_from_snapshot(snapshot: dict[str, object]) -> NumberRules:
-    return NumberRules(**{field.name: snapshot[field.name] for field in fields(NumberRules)})  # type: ignore[arg-type]
-
-
 @transaction.atomic
 def create_solo(
     *,
     guest: GuestIdentity,
     command_id: uuid.UUID,
     preset_id: str,
-    secret_factory: Callable[[NumberRules], str] | None = None,
+    secret_factory: Callable[[Rules], object] | None = None,
 ) -> tuple[Match, bool]:
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
     request_hash = fingerprint({"preset_id": preset_id})
@@ -84,8 +75,11 @@ def create_solo(
         avatar_id=guest.avatar_id,
         connected=True,
     )
-    factory = secret_factory or generate_number_secret
-    Challenge.objects.create(match=match, protected_secret=encrypt_secret(factory(rules)))
+    adapter = adapter_for(rules.game_type)
+    secret = secret_factory(rules) if secret_factory else adapter.generate_secret(rules)
+    Challenge.objects.create(
+        match=match, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
+    )
     CommandRecord.objects.create(
         guest=guest,
         command_id=command_id,
@@ -227,7 +221,7 @@ def _submit_guess(
     guest: GuestIdentity,
     match_id: uuid.UUID,
     command_id: uuid.UUID,
-    guess: str,
+    guess: object,
     now: datetime | None = None,
 ) -> tuple[Attempt | None, Match, bool]:
     now = now or timezone.now()
@@ -266,12 +260,13 @@ def _submit_guess(
         return None, match, False
     if participant.attempt_count >= rules.attempt_limit:
         raise GameAPIError("attempt_limit_reached", "Attempt limit has been reached.")
+    adapter = adapter_for(rules.game_type)
+    serialized_secret = decrypt_secret(match.challenge.protected_secret)
+    secret = adapter.decode_secret(rules, serialized_secret)
     try:
-        validate_sequence(guess, rules)
-    except GuessValidationError as exc:
+        canonical_guess, feedback, solved = adapter.evaluate(rules, secret, guess)
+    except (GuessValidationError, ColorValidationError) as exc:
         raise GameAPIError(exc.code, "Guess violates the active rules.", status_code=400) from exc
-    secret = decrypt_secret(match.challenge.protected_secret)
-    positions, solved = evaluate_number(rules=rules, secret=secret, guess=guess)
     participant.attempt_count += 1
     participant.solve_state = (
         Participant.SolveState.SOLVED if solved else Participant.SolveState.PLAYING
@@ -286,8 +281,8 @@ def _submit_guess(
         command_id=command_id,
         request_fingerprint=request_hash,
         ordinal=participant.attempt_count,
-        guess=guess,
-        feedback={"kind": "positional", "positions": positions},
+        guess=canonical_guess,
+        feedback=feedback,
         solved=solved,
         accepted_at=now,
     )
@@ -359,7 +354,7 @@ def submit_guess(
     guest: GuestIdentity,
     match_id: uuid.UUID,
     command_id: uuid.UUID,
-    guess: str,
+    guess: object,
     now: datetime | None = None,
 ) -> tuple[Attempt, Match, bool]:
     try:
@@ -373,6 +368,7 @@ def submit_guess(
             "leading_zero_not_allowed",
             "duplicate_not_allowed",
             "repetition_limit_exceeded",
+            "invalid_permutation",
         }:
             rejected_match = Match.objects.filter(pk=match_id).first()
             if rejected_match is not None:

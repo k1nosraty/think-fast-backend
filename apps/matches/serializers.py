@@ -10,7 +10,7 @@ class CreateSoloSerializer(serializers.Serializer[dict[str, object]]):
 
 class GuessSerializer(serializers.Serializer[dict[str, object]]):
     command_id = serializers.UUIDField()
-    guess = serializers.CharField(min_length=1, max_length=20, trim_whitespace=False)
+    guess = serializers.JSONField()
 
 
 class CommandSerializer(serializers.Serializer[dict[str, object]]):

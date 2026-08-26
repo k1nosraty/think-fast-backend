@@ -1,5 +1,5 @@
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Literal
 
 FeedbackToken = Literal["exact", "present", "absent"]
@@ -25,7 +25,7 @@ class NumberRules:
         return asdict(self)
 
 
-PRESETS = {
+NUMBER_PRESETS = {
     "number_classic_5_v1": NumberRules(
         "number_classic_5_v1",
         "number",
@@ -58,14 +58,18 @@ PRESETS = {
     ),
 }
 
+from apps.games.color import COLOR_PRESETS, ColorRules  # noqa: E402
 
-def rules_for_mode(preset_id: str, mode: Literal["practice", "friendly"]) -> NumberRules | None:
+PRESETS: dict[str, NumberRules | ColorRules] = {**NUMBER_PRESETS, **COLOR_PRESETS}
+
+
+def rules_for_mode(
+    preset_id: str, mode: Literal["practice", "friendly"]
+) -> NumberRules | ColorRules | None:
     rules = PRESETS.get(preset_id)
     if rules is None:
         return None
-    values = rules.snapshot()
-    values["match_mode"] = mode
-    return NumberRules(**values)  # type: ignore[arg-type]
+    return replace(rules, match_mode=mode)
 
 
 class GuessValidationError(ValueError):
