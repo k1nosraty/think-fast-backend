@@ -14,6 +14,7 @@ from apps.games.domain import PRESETS, GuessValidationError
 from apps.games.registry import Rules, adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret, encrypt_secret
 from apps.matches.errors import GameAPIError
+from apps.matches.features import require_match_creation
 from apps.matches.models import (
     Attempt,
     Challenge,
@@ -41,6 +42,7 @@ def create_solo(
     preset_id: str,
     secret_factory: Callable[[Rules], object] | None = None,
 ) -> tuple[Match, bool]:
+    require_match_creation()
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
     request_hash = fingerprint({"preset_id": preset_id})
     prior = (

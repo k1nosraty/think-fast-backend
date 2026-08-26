@@ -117,7 +117,7 @@ class RematchView(APIView):
 
 class ChallengeCommitView(APIView):
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "match_create"
+    throttle_scope = "challenge_commit"
 
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
         serializer = CommitChallengeSerializer(data=request.data)
@@ -145,6 +145,9 @@ class RoomCreateView(APIView):
 
 
 class RoomDetailView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "snapshot"
+
     def get(self, request: Request, room_id: uuid.UUID) -> Response:
         room = Room.objects.filter(pk=room_id).first()
         if room is None:
@@ -157,6 +160,9 @@ class RoomDetailView(APIView):
 
 
 class RoomJoinView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "room_command"
+
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
         serializer = CommandSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -167,6 +173,9 @@ class RoomJoinView(APIView):
 
 
 class RoomReadyView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "room_command"
+
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
         serializer = ReadySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -177,6 +186,9 @@ class RoomReadyView(APIView):
 
 
 class RoomStartView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "room_command"
+
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
         serializer = CommandSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -190,6 +202,9 @@ class RoomStartView(APIView):
 
 
 class RoomLeaveView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "room_command"
+
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
         serializer = CommandSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

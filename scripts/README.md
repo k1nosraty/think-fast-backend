@@ -5,3 +5,7 @@ CI. `validate_contracts.py` remains the dependency-free T0 contract validator.
 
 Prefer Django management commands for operations that need application context.
 Scripts must be non-interactive in CI and safe to run repeatedly where possible.
+
+T8 adds `check_security.py`, staging smoke, checksummed PostgreSQL backup/restore
+and a Word-spike benchmark. Restore requires an exact database confirmation and
+is never part of an ordinary automated check.

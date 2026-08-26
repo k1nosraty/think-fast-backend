@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.accounts.models import GuestIdentity
 from apps.analytics.service import record_analytics
 from apps.matches.errors import GameAPIError
+from apps.matches.features import require_match_creation
 from apps.matches.models import CommandRecord, Match, RematchProposal, Room, RoomMembership
 from apps.matches.rooms import _create_friendly_match
 from apps.matches.services import fingerprint
@@ -133,6 +134,7 @@ def rematch_command(
         )
         record_analytics("rematch_requested", match_id=match.id, room_id=room.id, state="pending")
     elif proposal.state == RematchProposal.State.PENDING and proposal.requester_id != guest.id:
+        require_match_creation()
         members = list(room.memberships.select_for_update())
         if len(members) != 2:
             raise GameAPIError("room_full", "Exactly two room members are required.")

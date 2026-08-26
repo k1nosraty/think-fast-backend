@@ -19,6 +19,7 @@ def test_production_settings_refuse_missing_secrets() -> None:
         "POSTGRES_PASSWORD",
         "REDIS_URL",
         "GAME_SECRET_ENCRYPTION_KEY",
+        "METRICS_BEARER_TOKEN",
     ):
         environment.pop(name, None)
     completed = subprocess.run(
@@ -41,6 +42,7 @@ def test_production_settings_accept_secure_explicit_configuration() -> None:
             "POSTGRES_PASSWORD": "not-a-real-secret",
             "REDIS_URL": "redis://redis:6379/0",
             "GAME_SECRET_ENCRYPTION_KEY": "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
+            "METRICS_BEARER_TOKEN": "x" * 40,
         }
     )
     completed = subprocess.run(

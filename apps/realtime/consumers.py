@@ -3,6 +3,7 @@ import uuid
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.conf import settings
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
@@ -10,6 +11,7 @@ from apps.matches.models import MatchEvent, Participant, RoomEvent, RoomMembersh
 from apps.matches.services import activate_countdown
 from apps.realtime.lifecycle import claim_connection, expire_disconnect_grace, release_connection
 from apps.realtime.publisher import match_group, room_group
+from config.observability import websocket_connected, websocket_disconnected
 
 
 @database_sync_to_async
@@ -99,6 +101,9 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
     connection_id: uuid.UUID
 
     async def connect(self) -> None:
+        if not settings.ENABLE_WEBSOCKETS:
+            await self.close(code=1013)
+            return
         user = self.scope.get("user")
         if not isinstance(user, GuestIdentity):
             await self.close(code=4401)
@@ -114,6 +119,7 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         protocols = self.scope.get("subprotocols", [])
         await self.accept(subprotocol="think-fast" if "think-fast" in protocols else None)
+        websocket_connected()
         replaced_channel = await _claim(self.participant_id, self.connection_id, self.channel_name)
         if replaced_channel and replaced_channel != self.channel_name:
             await self.channel_layer.send(replaced_channel, {"type": "force.disconnect"})
@@ -130,6 +136,7 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
 
     async def disconnect(self, close_code: int) -> None:
         if hasattr(self, "group_name"):
+            websocket_disconnected()
             if hasattr(self, "countdown_task"):
                 self.countdown_task.cancel()
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
@@ -198,6 +205,9 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
     group_name: str
 
     async def connect(self) -> None:
+        if not settings.ENABLE_WEBSOCKETS:
+            await self.close(code=1013)
+            return
         user = self.scope.get("user")
         if not isinstance(user, GuestIdentity):
             await self.close(code=4401)
@@ -210,9 +220,11 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         protocols = self.scope.get("subprotocols", [])
         await self.accept(subprotocol="think-fast" if "think-fast" in protocols else None)
+        websocket_connected()
 
     async def disconnect(self, close_code: int) -> None:
         if hasattr(self, "group_name"):
+            websocket_disconnected()
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive_json(self, content: object, **kwargs: object) -> None:

@@ -186,6 +186,13 @@ are explicit and evidence-backed.
 
 **Effort:** Very high.
 
+**Status:** Release candidate on 2026-08-26, not accepted as Production Beta.
+Security, retention, observability, kill switches, audit, backup/restore,
+staging, smoke and capacity harnesses are implemented. Real PostgreSQL/Redis,
+backup/restore RPO/RTO and required staging load/failure/deploy drills remain
+mandatory evidence; see `docs/operations/README.md`. Do not start T9 from this
+status.
+
 - Finalize security config, HTTPS/WSS, origin/host policy, throttles, admin least
   privilege, scanning, retention/deletion and audit.
 - Add safe logs/traces/request IDs, metrics/dashboards/alerts, error reporting,

@@ -20,11 +20,13 @@ from apps.matches.views import (
     SoloMatchCreateView,
 )
 from config.health import live, ready
+from config.metrics import metrics
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/live/", live, name="health-live"),
     path("health/ready/", ready, name="health-ready"),
+    path("metrics/", metrics, name="metrics"),
     path("api/v1/guest-sessions/", GuestSessionCreateView.as_view(), name="guest-session-create"),
     path("api/v1/game-definitions/", GameDefinitionListView.as_view(), name="game-definition-list"),
     path("api/v1/solo-matches/", SoloMatchCreateView.as_view(), name="solo-match-create"),

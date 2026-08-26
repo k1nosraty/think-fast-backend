@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.matches.models import Match, MatchEvent, Participant, Room, RoomEvent
+from config.observability import record_outbox_delivery_failure
 
 logger = logging.getLogger("think_fast.outbox")
 
@@ -22,6 +23,7 @@ def room_group(room_id: object) -> str:
 
 
 def _delivery_failed(event: MatchEvent | RoomEvent, exc: Exception) -> None:
+    record_outbox_delivery_failure()
     event.publish_attempts += 1
     event.next_attempt_at = timezone.now() + timedelta(seconds=min(2**event.publish_attempts, 300))
     event.last_error = type(exc).__name__[:500]

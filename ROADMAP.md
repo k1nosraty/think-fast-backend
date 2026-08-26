@@ -16,7 +16,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T5 | Rematch and gameplay polish | **Complete** — play-rematch loop and safe playtest analytics |
 | T6 | Color expansion | **Complete** — Color Classic and Permutation use the shared match platform |
 | T7 | Challenge expansion | **Complete** — safe player-authored duel; Word remains gated after bounded spike |
-| T8 | Production beta | Secure, observable, load-tested staged release |
+| T8 | Production beta | **Release candidate** — hardening/harness complete; staging load and restore evidence pending |
 | T9 | Competitive product | Ranked/matchmaking/progression only after MVP evidence |
 
 ## Release boundaries

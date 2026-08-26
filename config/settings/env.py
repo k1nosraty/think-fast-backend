@@ -27,3 +27,12 @@ def integer(name: str, default: int) -> int:
         return int(raw)
     except ValueError:
         fail(f"Environment variable {name} must be an integer")
+
+
+def boolean(name: str, default: bool) -> bool:
+    raw = get(name, "true" if default else "false").lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    fail(f"Environment variable {name} must be a boolean")

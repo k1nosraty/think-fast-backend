@@ -15,11 +15,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "bandit>=1.8.6,<2",
   "django-stubs[compatible-mypy]>=5.2.7,<6",
   "djangorestframework-stubs[compatible-mypy]>=3.16.6,<4",
   "mypy>=1.18.2,<2",
+  "pip-audit>=2.9.0,<3",
   "pre-commit>=4.3.0,<5",
-  "pytest>=8.4.2,<9",
+  "pytest>=9.0.3,<10",
   "pytest-cov>=7.0.0,<8",
   "pytest-django>=4.11.1,<5",
   "ruff>=0.13.2,<1",

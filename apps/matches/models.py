@@ -119,6 +119,7 @@ class Challenge(models.Model):
     )
     protected_secret = models.TextField(editable=False)
     committed_at = models.DateTimeField(null=True, blank=True)
+    secret_destroyed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [

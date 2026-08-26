@@ -10,6 +10,8 @@ Backend Tasks T0–T7 are complete. MVP contracts are frozen at
 The Room-to-rematch loop, safe playtest analytics, Color Classic and Color
 Permutation and safe player-authored Friendly challenges are implemented. The
 T7 Word spike is a documented production NO-GO pending licensed data evidence.
+T8 hardening is implemented as a release candidate, but Production Beta exit is
+blocked until the staging capacity and backup/restore register is measured.
 
 ## MVP
 
@@ -42,6 +44,7 @@ Role-specific handoff:
 
 - [Backend guide](docs/backend/README.md)
 - [Quality strategy](docs/quality/README.md)
+- [Production operations and T8 evidence](docs/operations/README.md)
 - [Documentation map and source-of-truth rules](docs/README.md)
 
 AI agents must read [AGENTS.md](AGENTS.md) before acting. More-specific
@@ -72,7 +75,7 @@ ephemeral coordination. WebSocket delivery never decides match state.
 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/) 0.11.33 or compatible
-- Docker with Compose for local PostgreSQL 17.6 and Redis 7.4.5
+- Docker with Compose for local PostgreSQL 17.11 and Redis 7.4.11
 
 ### Bootstrap a clean machine
 
@@ -134,6 +137,7 @@ uv run python manage.py seed_playtest
 
 ```bash
 uv run python scripts/check.py
+uv run python scripts/check_security.py
 ```
 
 This runs formatting, lint, strict type checking, Django checks, migration drift,
@@ -142,7 +146,7 @@ contract validation, pytest and the 85% coverage threshold.
 ### Build the production image
 
 ```bash
-docker build --tag think-fast-backend:t7 .
+docker build --tag think-fast-backend:t8 .
 ```
 
 The image starts Daphne with `config.settings.production`. It refuses to boot
@@ -159,6 +163,13 @@ Export shareable aggregate playtest data without raw guesses or secrets:
 
 ```bash
 uv run python manage.py export_playtest_analytics --format json --since-days 30
+```
+
+Preview and apply privacy retention from a singleton scheduled worker:
+
+```bash
+uv run python manage.py apply_retention
+uv run python manage.py apply_retention --apply --actor scheduled-retention
 ```
 
 ## Foundation and contract assets

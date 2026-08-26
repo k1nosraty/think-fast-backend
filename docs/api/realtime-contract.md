@@ -224,6 +224,8 @@ challenge_setup_closed
 challenge_setup_expired
 challenge_already_committed
 challenge_not_committed
+feature_disabled
+internal_error
 rate_limited
 resync_required
 client_version_unsupported

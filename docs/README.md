@@ -12,6 +12,7 @@ other files link to it instead of copying it.
 | HTTP, WebSocket, errors, snapshot | `api/realtime-contract.md` |
 | Backend implementation conventions | `backend/README.md` |
 | Test and acceptance strategy | `quality/README.md` |
+| Production operations and T8 evidence | `operations/README.md` |
 | Delivery order | root `ROADMAP.md` |
 | Copy-ready Backend AI work units | `execution/BACKEND-TASKS.md` |
 | Why an architectural choice exists | `decisions/` ADRs |

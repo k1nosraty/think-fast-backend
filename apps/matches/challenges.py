@@ -11,6 +11,7 @@ from apps.games.domain import GuessValidationError
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import encrypt_secret
 from apps.matches.errors import GameAPIError
+from apps.matches.features import require_player_authored_challenges
 from apps.matches.models import Challenge, CommandRecord, Match, Participant, Room, RoomMembership
 from apps.matches.services import fingerprint
 from apps.realtime.publisher import record_event
@@ -159,6 +160,7 @@ def commit_challenge(
     secret: object,
     now: datetime | None = None,
 ) -> tuple[Match, bool]:
+    require_player_authored_challenges()
     match, created, expired = _commit_challenge(
         guest=guest,
         match_id=match_id,

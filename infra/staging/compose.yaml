@@ -1,0 +1,26 @@
+name: think-fast-staging
+
+services:
+  app:
+    image: ${THINK_FAST_IMAGE:?Set immutable THINK_FAST_IMAGE digest}
+    env_file: ${THINK_FAST_ENV_FILE:?Set THINK_FAST_ENV_FILE}
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
+    init: true
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live/', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  reliability-worker:
+    image: ${THINK_FAST_IMAGE:?Set immutable THINK_FAST_IMAGE digest}
+    env_file: ${THINK_FAST_ENV_FILE:?Set THINK_FAST_ENV_FILE}
+    command:
+      - sh
+      - -c
+      - while true; do python manage.py sweep_reliability --limit 1000; sleep 1; done
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped

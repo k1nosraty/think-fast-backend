@@ -57,10 +57,12 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 Challenge.objects.filter(match=match, solver=participant).first()
                 or Challenge.objects.filter(match=match, solver__isnull=True).first()
             )
-            assert challenge is not None
-            result["revealed_secret"] = adapter_for(rules.game_type).decode_secret(
-                rules, decrypt_secret(challenge.protected_secret)
-            )
+            if challenge is not None and challenge.secret_destroyed_at is None:
+                result["revealed_secret"] = adapter_for(rules.game_type).decode_secret(
+                    rules, decrypt_secret(challenge.protected_secret)
+                )
+            else:
+                result["secret_revealed"] = False
     actions = ["submit_guess", "leave"] if match.state == Match.State.ACTIVE else []
     setup = None
     if match.state == Match.State.SETUP:

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from config.settings.env import get, integer
+from config.settings.env import boolean, get, integer
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -104,6 +104,8 @@ REST_FRAMEWORK = {
         "snapshot": "120/minute",
         "leave": "30/hour",
         "rematch": "60/hour",
+        "room_command": "120/minute",
+        "challenge_commit": "30/hour",
     },
     "EXCEPTION_HANDLER": "config.api_errors.exception_handler",
 }
@@ -113,6 +115,15 @@ FRIENDLY_COUNTDOWN_SECONDS = integer("FRIENDLY_COUNTDOWN_SECONDS", 3)
 PLAYER_CHALLENGE_SETUP_SECONDS = integer("PLAYER_CHALLENGE_SETUP_SECONDS", 120)
 FRIENDLY_DISCONNECT_GRACE_SECONDS = integer("FRIENDLY_DISCONNECT_GRACE_SECONDS", 30)
 REMATCH_REQUEST_TTL_SECONDS = integer("REMATCH_REQUEST_TTL_SECONDS", 60)
+ENABLE_MATCH_CREATION = boolean("ENABLE_MATCH_CREATION", True)
+ENABLE_PLAYER_AUTHORED_CHALLENGES = boolean("ENABLE_PLAYER_AUTHORED_CHALLENGES", True)
+ENABLE_WEBSOCKETS = boolean("ENABLE_WEBSOCKETS", True)
+LOAD_FIXTURES_ENABLED = boolean("LOAD_FIXTURES_ENABLED", False)
+METRICS_BEARER_TOKEN = get("METRICS_BEARER_TOKEN", "")
+SECRET_RETENTION_HOURS = integer("SECRET_RETENTION_HOURS", 24)
+ATTEMPT_RETENTION_DAYS = integer("ATTEMPT_RETENTION_DAYS", 90)
+MATCH_RETENTION_DAYS = integer("MATCH_RETENTION_DAYS", 365)
+GUEST_RETENTION_DAYS = integer("GUEST_RETENTION_DAYS", 30)
 
 LOGGING = {
     "version": 1,

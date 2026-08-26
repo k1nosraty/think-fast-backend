@@ -8,6 +8,7 @@ from collections.abc import Callable
 from django.http import HttpRequest, HttpResponse
 
 from config.logging import request_id_context
+from config.observability import observe_request
 
 logger = logging.getLogger("think_fast.request")
 
@@ -32,6 +33,15 @@ class RequestContextMiddleware:
         try:
             response = self.get_response(request)
             response.headers["X-Request-ID"] = request_id
+            duration_seconds = time.monotonic() - started
+            route = (
+                str(request.resolver_match.route or "unmatched")
+                if request.resolver_match
+                else "unmatched"
+            )
+            observe_request(
+                request.method or "UNKNOWN", route, response.status_code, duration_seconds
+            )
             logger.info(
                 "request.completed",
                 extra={
@@ -39,7 +49,7 @@ class RequestContextMiddleware:
                         "method": request.method,
                         "path": request.path,
                         "status_code": response.status_code,
-                        "duration_ms": round((time.monotonic() - started) * 1000, 2),
+                        "duration_ms": round(duration_seconds * 1000, 2),
                     }
                 },
             )

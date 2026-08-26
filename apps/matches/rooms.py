@@ -14,6 +14,7 @@ from apps.games.domain import rules_for_mode
 from apps.games.registry import Rules, adapter_for
 from apps.games.secrets import encrypt_secret
 from apps.matches.errors import GameAPIError
+from apps.matches.features import require_match_creation, require_player_authored_challenges
 from apps.matches.models import (
     Challenge,
     CommandRecord,
@@ -165,6 +166,9 @@ def create_room(
     preset_id: str,
     challenge_source: str = Room.ChallengeSource.SYSTEM,
 ) -> tuple[Room, bool]:
+    require_match_creation()
+    if challenge_source == Room.ChallengeSource.PLAYERS:
+        require_player_authored_challenges()
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
     request_hash = fingerprint({"preset_id": preset_id, "challenge_source": challenge_source})
     prior = (
@@ -320,6 +324,7 @@ def start_room(
     command_id: uuid.UUID,
     secret_factory: Callable[[Rules], object] | None = None,
 ) -> tuple[Match, bool]:
+    require_match_creation()
     room = Room.objects.select_for_update().filter(pk=room_id).first()
     if room is None:
         raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
