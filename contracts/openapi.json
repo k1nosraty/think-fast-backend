@@ -226,6 +226,26 @@
         }
       }
     },
+    "/matches/{match_id}/challenges/": {
+      "post": {
+        "operationId": "commitPlayerChallenge",
+        "summary": "Commit an immutable Secret for the other participant",
+        "security": [{"guestBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/MatchId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommitChallengeCommand"}}}
+        },
+        "responses": {
+          "201": {"description": "Challenge committed", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
+          "200": {"description": "Idempotent replay", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"},
+          "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
     "/matches/{match_id}/snapshot/": {
       "get": {
         "operationId": "getMatchSnapshot",
@@ -338,18 +358,34 @@
         "required": ["command_id", "preset_id"],
         "properties": {
           "command_id": {"type": "string", "format": "uuid"},
-          "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1", "color_classic_5_v1", "color_permutation_8_v1"]}
+          "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1", "color_classic_5_v1", "color_permutation_8_v1"]},
+          "challenge_source": {"enum": ["system", "players"], "default": "system"}
+        }
+      },
+      "CommitChallengeCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command_id", "secret"],
+        "properties": {
+          "command_id": {"type": "string", "format": "uuid"},
+          "secret": {
+            "oneOf": [
+              {"type": "string", "pattern": "^[0-9]{5,6}$"},
+              {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+            ]
+          }
         }
       },
       "RoomSnapshot": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "state", "latest_sequence", "latest_match_id", "rematch", "members"],
+        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "challenge_source", "state", "latest_sequence", "latest_match_id", "rematch", "members"],
         "properties": {
           "room_id": {"type": "string", "format": "uuid"},
           "join_code": {"type": "string", "pattern": "^[A-HJ-NP-Z2-9]{6}$"},
           "host_participant_id": {"type": "string", "format": "uuid"},
           "preset_id": {"type": "string"},
+          "challenge_source": {"enum": ["system", "players"]},
           "state": {"enum": ["waiting", "ready_check", "countdown", "active", "closed"]},
           "latest_sequence": {"type": "integer", "minimum": 0},
           "latest_match_id": {"type": ["string", "null"], "format": "uuid"},

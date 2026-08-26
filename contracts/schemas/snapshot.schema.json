@@ -7,13 +7,13 @@
   "required": [
     "contract_version", "match_id", "room_id", "state", "rules",
     "server_time", "started_at", "deadline", "viewer", "participants",
-    "own_attempts", "result", "latest_sequence", "available_actions"
+    "own_attempts", "challenge_setup", "result", "latest_sequence", "available_actions"
   ],
   "properties": {
     "contract_version": {"const": "v1.0.0-draft.1"},
     "match_id": {"type": "string", "format": "uuid"},
     "room_id": {"type": ["string", "null"], "format": "uuid"},
-    "state": {"enum": ["waiting", "ready_check", "countdown", "active", "finishing", "finished", "cancelled", "abandoned", "voided"]},
+    "state": {"enum": ["setup", "waiting", "ready_check", "countdown", "active", "finishing", "finished", "cancelled", "abandoned", "voided"]},
     "rules": {"$ref": "ruleset.schema.json"},
     "server_time": {"type": "string", "format": "date-time"},
     "started_at": {"type": ["string", "null"], "format": "date-time"},
@@ -67,6 +67,22 @@
         }
       }
     },
+    "challenge_setup": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expires_at", "own_challenge_committed", "committed_count", "required_count"],
+          "properties": {
+            "expires_at": {"type": "string", "format": "date-time"},
+            "own_challenge_committed": {"type": "boolean"},
+            "committed_count": {"type": "integer", "minimum": 0, "maximum": 2},
+            "required_count": {"const": 2}
+          }
+        }
+      ]
+    },
     "result": {
       "oneOf": [
         {"type": "null"},
@@ -93,7 +109,7 @@
     "available_actions": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["start", "ready", "unready", "submit_guess", "leave", "request_rematch"]}
+      "items": {"enum": ["start", "ready", "unready", "commit_challenge", "submit_guess", "leave", "request_rematch"]}
     }
   }
 }

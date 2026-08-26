@@ -230,7 +230,11 @@ both solve simultaneously after countdown
 ```
 
 - A committed Secret is immutable and private from its solver.
-- Setup timeout cancels without win/loss.
+- Room creation explicitly selects `challenge_source=players`; the default
+  remains `system`. This option is Friendly 1v1 only.
+- Setup lasts 120 seconds. Commit validates against the frozen RuleSet; the
+  second Commit starts the shared countdown atomically.
+- Setup timeout or participant leave cancels without Result, win, or loss.
 - Creator sees only the same public progress allowed to an opponent.
 - Results are Friendly-only and never rating-eligible because challenge
   difficulty differs.
@@ -249,6 +253,9 @@ T7 must prototype and decide:
 - latency, false-accept, and false-reject thresholds.
 
 AI moderation may assist later but cannot be the authoritative core validator.
+T7's measured outcome is documented in
+[the Word feasibility spike](word-feasibility-spike.md): production support is
+NO-GO until its licensed-data, quality and moderation gates pass.
 
 ## Accessibility and localization
 

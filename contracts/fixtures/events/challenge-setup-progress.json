@@ -1,0 +1,9 @@
+{
+  "type": "challenge.setup_progress",
+  "version": 1,
+  "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+  "sequence": 2,
+  "occurred_at": "2026-08-26T12:30:00Z",
+  "visibility": "match",
+  "payload": {"committed_count": 1, "required_count": 2}
+}

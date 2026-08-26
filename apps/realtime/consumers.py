@@ -28,7 +28,14 @@ def _initial_event_ids(match_id: uuid.UUID) -> list[str]:
         str(event_id)
         for event_id in MatchEvent.objects.filter(
             match_id=match_id,
-            event_type__in=["match.countdown_started", "match.started"],
+            event_type__in=[
+                "challenge.setup_started",
+                "challenge.committed",
+                "challenge.setup_progress",
+                "challenge.setup_cancelled",
+                "match.countdown_started",
+                "match.started",
+            ],
         ).values_list("id", flat=True)
     ]
 

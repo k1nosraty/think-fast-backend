@@ -158,6 +158,11 @@ green; no duplicated lifecycle/realtime or large game-type conditional chain.
 
 **Effort:** Very high, two ordered gates.
 
+**Status:** Complete on 2026-08-26. Symmetric per-solver Challenge setup,
+immutable encrypted Commit, timeout cancellation, viewer-authorized recovery
+and reveal are implemented. The bounded Word prototype recommends NO-GO for
+production until licensed dataset and measured quality gates pass. Next is T8.
+
 Part A:
 
 - Freeze Challenge-per-solver and setup/commit/timeout/reveal contracts.

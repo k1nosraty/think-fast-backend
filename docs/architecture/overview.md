@@ -31,10 +31,15 @@ Game-specific validation/generation/evaluation is selected through a small
 explicit registry keyed by `game_type`. Adapters expose one narrow contract;
 Match lifecycle remains shared and contains no growing game-type conditional.
 
+Player-authored Friendly setup is an application concern: each creator commits
+an encrypted Challenge assigned to the other solver. The second Commit advances
+one locked Match into countdown; timeout cancels without creating a Result.
+
 ## Core interaction: submit guess
 
 1. Authenticate participant and validate command/idempotency key.
-2. Lock or atomically advance the participant Challenge state.
+2. Lock or atomically advance the Match and resolve the Challenge assigned to
+   the submitting solver (or the shared system Challenge).
 3. Confirm match is active and server deadline has not passed.
 4. Normalize the guess under the frozen rule configuration.
 5. Load the protected Secret and call the registered Game Type evaluator.

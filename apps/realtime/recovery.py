@@ -1,5 +1,6 @@
 from django.utils import timezone
 
+from apps.matches.challenges import expire_challenge_setup
 from apps.matches.models import Match, Participant, RematchProposal
 from apps.matches.rematches import expire_rematch_proposal
 from apps.matches.services import activate_countdown, refresh_match_state
@@ -9,6 +10,12 @@ from apps.realtime.publisher import publish_pending
 
 def sweep_reliability(*, limit: int = 100) -> dict[str, int]:
     now = timezone.now()
+    setup_ids = list(
+        Match.objects.filter(state=Match.State.SETUP, setup_expires_at__lte=now).values_list(
+            "id", flat=True
+        )[:limit]
+    )
+    expired_setups = sum(expire_challenge_setup(match_id, now=now) for match_id in setup_ids)
     countdown_ids = list(
         Match.objects.filter(state=Match.State.COUNTDOWN, started_at__lte=now).values_list(
             "id", flat=True
@@ -48,6 +55,7 @@ def sweep_reliability(*, limit: int = 100) -> dict[str, int]:
     expired_rematches = sum(expire_rematch_proposal(item, now=now) for item in rematch_ids)
     delivered, attempted = publish_pending(limit=limit)
     return {
+        "challenge_setups_expired": expired_setups,
         "countdowns": len(countdown_ids),
         "matches": len(due_matches) + len(finishing),
         "abandoned": abandoned,

@@ -6,6 +6,10 @@ from apps.accounts.models import GuestIdentity
 
 
 class Room(models.Model):
+    class ChallengeSource(models.TextChoices):
+        SYSTEM = "system"
+        PLAYERS = "players"
+
     class State(models.TextChoices):
         WAITING = "waiting"
         READY_CHECK = "ready_check"
@@ -16,6 +20,9 @@ class Room(models.Model):
     join_code = models.CharField(max_length=6, unique=True)
     host = models.ForeignKey(GuestIdentity, on_delete=models.PROTECT, related_name="hosted_rooms")
     preset_id = models.CharField(max_length=50)
+    challenge_source = models.CharField(
+        max_length=20, choices=ChallengeSource, default=ChallengeSource.SYSTEM
+    )
     state = models.CharField(max_length=20, choices=State, default=State.WAITING)
     latest_sequence = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,11 +48,13 @@ class RoomMembership(models.Model):
 
 class Match(models.Model):
     class State(models.TextChoices):
+        SETUP = "setup"
         COUNTDOWN = "countdown"
         ACTIVE = "active"
         FINISHING = "finishing"
         FINISHED = "finished"
         ABANDONED = "abandoned"
+        CANCELLED = "cancelled"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     room = models.ForeignKey(
@@ -55,6 +64,7 @@ class Match(models.Model):
     rules = models.JSONField()
     started_at = models.DateTimeField()
     deadline = models.DateTimeField()
+    setup_expires_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
     finish_due_at = models.DateTimeField(null=True, blank=True)
     latest_sequence = models.PositiveIntegerField(default=0)
@@ -92,8 +102,41 @@ class Participant(models.Model):
 
 class Challenge(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    match = models.OneToOneField(Match, on_delete=models.CASCADE, related_name="challenge")
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="challenges")
+    creator = models.ForeignKey(
+        Participant,
+        on_delete=models.PROTECT,
+        related_name="created_challenges",
+        null=True,
+        blank=True,
+    )
+    solver = models.ForeignKey(
+        Participant,
+        on_delete=models.CASCADE,
+        related_name="assigned_challenges",
+        null=True,
+        blank=True,
+    )
     protected_secret = models.TextField(editable=False)
+    committed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["match", "solver"], name="unique_match_solver_challenge"
+            ),
+            models.UniqueConstraint(
+                fields=["match"],
+                condition=models.Q(solver__isnull=True),
+                name="unique_shared_match_challenge",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(creator__isnull=True)
+                | models.Q(solver__isnull=True)
+                | ~models.Q(creator=models.F("solver")),
+                name="challenge_creator_not_solver",
+            ),
+        ]
 
 
 class Attempt(models.Model):

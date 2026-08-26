@@ -2,25 +2,25 @@
   "contract_version": "v1.0.0-draft.1",
   "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
   "room_id": "32abbc5e-a156-44a1-b88f-8e2f4905934e",
-  "state": "active",
+  "state": "setup",
   "rules": {
-    "preset_id": "number_brain_burner_6_v1",
+    "preset_id": "number_classic_5_v1",
     "game_type": "number",
     "match_mode": "friendly",
     "schema_version": 1,
     "evaluator_version": 1,
-    "sequence_length": 6,
+    "sequence_length": 5,
     "allow_leading_zero": false,
     "allow_duplicates": true,
     "max_symbol_repetition": 2,
     "feedback_policy": "positional",
     "history_policy": {"type": "full"},
-    "match_deadline_seconds": 240,
-    "attempt_limit": 15
+    "match_deadline_seconds": 180,
+    "attempt_limit": 12
   },
-  "server_time": "2026-08-24T08:30:00Z",
-  "started_at": "2026-08-24T08:28:30Z",
-  "deadline": "2026-08-24T08:32:30Z",
+  "server_time": "2026-08-26T12:30:00Z",
+  "started_at": "2026-08-26T12:32:03Z",
+  "deadline": "2026-08-26T12:35:03Z",
   "viewer": {
     "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
     "display_name": "Amir",
@@ -32,7 +32,7 @@
       "display_name": "Amir",
       "avatar_id": "avatar_01",
       "connection_state": "connected",
-      "attempt_count": 4,
+      "attempt_count": 0,
       "solve_state": "playing"
     },
     {
@@ -40,25 +40,18 @@
       "display_name": "Keyvan",
       "avatar_id": "avatar_02",
       "connection_state": "connected",
-      "attempt_count": 3,
+      "attempt_count": 0,
       "solve_state": "playing"
     }
   ],
-  "own_attempts": [
-    {
-      "attempt_id": "c21af716-98f6-410d-af25-bcaa5126bb2d",
-      "ordinal": 4,
-      "guess": "102312",
-      "feedback": {
-        "kind": "positional",
-        "positions": ["exact", "present", "present", "present", "present", "present"]
-      },
-      "accepted_at": "2026-08-24T08:29:59.750Z",
-      "solved": false
-    }
-  ],
-  "challenge_setup": null,
+  "own_attempts": [],
+  "challenge_setup": {
+    "expires_at": "2026-08-26T12:32:00Z",
+    "own_challenge_committed": true,
+    "committed_count": 1,
+    "required_count": 2
+  },
   "result": null,
-  "latest_sequence": 18,
-  "available_actions": ["submit_guess", "leave"]
+  "latest_sequence": 3,
+  "available_actions": ["leave"]
 }

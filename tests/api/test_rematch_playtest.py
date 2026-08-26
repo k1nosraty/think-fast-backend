@@ -40,7 +40,7 @@ def test_full_rematch_creates_fresh_match_without_stale_private_state() -> None:
     new_match = Match.objects.get(pk=accepted.data["latest_match_id"])
     assert new_match.id != source.id
     assert new_match.rules == source.rules
-    assert decrypt_secret(new_match.challenge.protected_secret) == "54321"
+    assert decrypt_secret(new_match.challenges.get(solver__isnull=True).protected_secret) == "54321"
     assert new_match.participants.count() == source.participants.count() == 2
     assert new_match.participants.filter(attempt_count=0).count() == 2
     assert not new_match.participants.filter(attempts__isnull=False).exists()

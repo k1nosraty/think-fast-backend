@@ -45,6 +45,7 @@ def room_snapshot(room: Room) -> dict[str, object]:
         "join_code": room.join_code,
         "host_participant_id": str(host_membership.id),
         "preset_id": room.preset_id,
+        "challenge_source": room.challenge_source,
         "state": room.state,
         "latest_sequence": room.latest_sequence,
         "latest_match_id": str(latest_match.id) if latest_match else None,
@@ -85,13 +86,19 @@ def _create_friendly_match(
     assert rules is not None
     now = timezone.now()
     countdown_seconds = settings.FRIENDLY_COUNTDOWN_SECONDS
+    player_authored = room.challenge_source == Room.ChallengeSource.PLAYERS
     started_at = now + timedelta(seconds=countdown_seconds)
     match = Match.objects.create(
         room=room,
-        state=Match.State.ACTIVE if countdown_seconds == 0 else Match.State.COUNTDOWN,
+        state=Match.State.SETUP
+        if player_authored
+        else (Match.State.ACTIVE if countdown_seconds == 0 else Match.State.COUNTDOWN),
         rules=rules.snapshot(),
         started_at=started_at,
         deadline=started_at + timedelta(seconds=rules.match_deadline_seconds),
+        setup_expires_at=now + timedelta(seconds=settings.PLAYER_CHALLENGE_SETUP_SECONDS)
+        if player_authored
+        else None,
     )
     for member in members:
         Participant.objects.create(
@@ -101,29 +108,42 @@ def _create_friendly_match(
             avatar_id=member.avatar_id,
             connected=member.connected,
         )
-    adapter = adapter_for(rules.game_type)
-    secret = secret_factory(rules) if secret_factory else adapter.generate_secret(rules)
-    Challenge.objects.create(
-        match=match, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
-    )
+    if not player_authored:
+        adapter = adapter_for(rules.game_type)
+        secret = secret_factory(rules) if secret_factory else adapter.generate_secret(rules)
+        Challenge.objects.create(
+            match=match, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
+        )
     room.state = Room.State.ACTIVE
     room.save(update_fields=["state", "updated_at"])
-    record_event(
-        match=match,
-        event_type="match.countdown_started",
-        visibility="match",
-        payload={"countdown_seconds": countdown_seconds},
-    )
-    if countdown_seconds == 0:
+    if player_authored:
+        assert match.setup_expires_at is not None
         record_event(
             match=match,
-            event_type="match.started",
+            event_type="challenge.setup_started",
             visibility="match",
             payload={
-                "started_at": started_at.isoformat().replace("+00:00", "Z"),
-                "deadline": match.deadline.isoformat().replace("+00:00", "Z"),
+                "expires_at": match.setup_expires_at.isoformat().replace("+00:00", "Z"),
+                "required_count": 2,
             },
         )
+    else:
+        record_event(
+            match=match,
+            event_type="match.countdown_started",
+            visibility="match",
+            payload={"countdown_seconds": countdown_seconds},
+        )
+        if countdown_seconds == 0:
+            record_event(
+                match=match,
+                event_type="match.started",
+                visibility="match",
+                payload={
+                    "started_at": started_at.isoformat().replace("+00:00", "Z"),
+                    "deadline": match.deadline.isoformat().replace("+00:00", "Z"),
+                },
+            )
     record_analytics(
         "match_started",
         match_id=match.id,
@@ -139,10 +159,14 @@ def _create_friendly_match(
 
 @transaction.atomic
 def create_room(
-    *, guest: GuestIdentity, command_id: uuid.UUID, preset_id: str
+    *,
+    guest: GuestIdentity,
+    command_id: uuid.UUID,
+    preset_id: str,
+    challenge_source: str = Room.ChallengeSource.SYSTEM,
 ) -> tuple[Room, bool]:
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
-    request_hash = fingerprint({"preset_id": preset_id})
+    request_hash = fingerprint({"preset_id": preset_id, "challenge_source": challenge_source})
     prior = (
         CommandRecord.objects.select_related("room")
         .filter(guest=guest, command_id=command_id)
@@ -166,7 +190,12 @@ def create_room(
             break
     else:
         raise GameAPIError("invalid_request", "Could not allocate a room code.", status_code=503)
-    room = Room.objects.create(join_code=code, host=guest, preset_id=preset_id)
+    room = Room.objects.create(
+        join_code=code,
+        host=guest,
+        preset_id=preset_id,
+        challenge_source=challenge_source,
+    )
     RoomMembership.objects.create(
         room=room,
         guest=guest,

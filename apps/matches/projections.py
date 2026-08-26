@@ -6,7 +6,7 @@ from apps.accounts.models import GuestIdentity
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Match, Participant
+from apps.matches.models import Challenge, Match, Participant
 
 
 def iso(value: datetime | None) -> str | None:
@@ -53,10 +53,26 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             "secret_revealed": match.result.secret_revealed,
         }
         if match.result.secret_revealed:
+            challenge = (
+                Challenge.objects.filter(match=match, solver=participant).first()
+                or Challenge.objects.filter(match=match, solver__isnull=True).first()
+            )
+            assert challenge is not None
             result["revealed_secret"] = adapter_for(rules.game_type).decode_secret(
-                rules, decrypt_secret(match.challenge.protected_secret)
+                rules, decrypt_secret(challenge.protected_secret)
             )
     actions = ["submit_guess", "leave"] if match.state == Match.State.ACTIVE else []
+    setup = None
+    if match.state == Match.State.SETUP:
+        own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
+        committed_count = Challenge.objects.filter(match=match, committed_at__isnull=False).count()
+        setup = {
+            "expires_at": iso(match.setup_expires_at),
+            "own_challenge_committed": own_commit,
+            "committed_count": committed_count,
+            "required_count": 2,
+        }
+        actions = ["leave"] if own_commit else ["commit_challenge", "leave"]
     if match.room_id and match.state in {Match.State.FINISHED, Match.State.ABANDONED}:
         actions.append("request_rematch")
     participants = list(match.participants.all())
@@ -89,6 +105,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             for item in participants
         ],
         "own_attempts": attempts,
+        "challenge_setup": setup,
         "result": result,
         "latest_sequence": match.latest_sequence,
         "available_actions": actions,

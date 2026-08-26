@@ -29,6 +29,7 @@ POST /api/v1/rooms/
 POST /api/v1/rooms/{room_id}/join/
 POST /api/v1/rooms/{room_id}/ready/
 POST /api/v1/rooms/{room_id}/start/
+POST /api/v1/matches/{match_id}/challenges/
 POST /api/v1/matches/{match_id}/guesses/
 POST /api/v1/matches/{match_id}/leave/
 POST /api/v1/matches/{match_id}/rematch/
@@ -111,6 +112,10 @@ Candidate event types:
 | --- | --- | --- |
 | `room.player_joined` | room public | lobby membership |
 | `room.ready_changed` | room public | readiness |
+| `challenge.setup_started` | match public | setup expiry and required count |
+| `challenge.committed` | creator private | idempotent Commit acknowledgement |
+| `challenge.setup_progress` | match public | count-only setup progress |
+| `challenge.setup_cancelled` | match public | timeout/leave cancellation, no Result |
 | `match.countdown_started` | match public | synchronized start |
 | `match.started` | match public | authoritative active state/deadline |
 | `guess.evaluated` | participant private | accepted Attempt and Feedback |
@@ -170,6 +175,18 @@ Initial load, page refresh, reconnect, and event-gap recovery all use Snapshot.
 snapshot exposes `latest_match_id` plus proposal state, requester, expiry and
 the new Match ID. Clients then subscribe to/fetch the new Match normally.
 
+## Player-authored Challenge contract
+
+A Room may opt into `challenge_source: players` (default `system`). Starting it
+creates a Friendly-only Match in `setup`. Each participant calls
+`POST /matches/{match_id}/challenges/` once with `command_id` and a RuleSet-shaped
+`secret`; the server validates, encrypts and assigns it to the other solver.
+Snapshot exposes only expiry, own Commit status and aggregate Commit count.
+Neither Secret, target solver nor opponent-private acknowledgement is public.
+The second Commit schedules countdown. Setup expiry/leave produces `cancelled`
+with `result: null` and no rating eligibility. Normal finish reveals only the
+Challenge assigned to the current viewer.
+
 ## Error envelope
 
 ```json
@@ -203,6 +220,10 @@ room_full
 not_room_host
 not_ready
 idempotency_conflict
+challenge_setup_closed
+challenge_setup_expired
+challenge_already_committed
+challenge_not_committed
 rate_limited
 resync_required
 client_version_unsupported

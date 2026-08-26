@@ -6,6 +6,7 @@ from django.urls import path
 from apps.accounts.views import GuestSessionCreateView
 from apps.games.views import GameDefinitionListView
 from apps.matches.views import (
+    ChallengeCommitView,
     GuessCreateView,
     LeaveView,
     RematchView,
@@ -34,6 +35,11 @@ urlpatterns = [
     path("api/v1/rooms/<uuid:room_id>/start/", RoomStartView.as_view(), name="room-start"),
     path("api/v1/rooms/<uuid:room_id>/leave/", RoomLeaveView.as_view(), name="room-leave"),
     path("api/v1/matches/<uuid:match_id>/guesses/", GuessCreateView.as_view(), name="guess-create"),
+    path(
+        "api/v1/matches/<uuid:match_id>/challenges/",
+        ChallengeCommitView.as_view(),
+        name="challenge-commit",
+    ),
     path("api/v1/matches/<uuid:match_id>/snapshot/", SnapshotView.as_view(), name="match-snapshot"),
     path("api/v1/matches/<uuid:match_id>/leave/", LeaveView.as_view(), name="match-leave"),
     path(

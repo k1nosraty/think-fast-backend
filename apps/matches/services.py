@@ -241,6 +241,12 @@ def _submit_guess(
                 "idempotency_conflict", "Command ID was already used with a different Guess."
             )
         return prior, match, False
+    if match.state == Match.State.SETUP:
+        from apps.matches.challenges import _cancel_setup_locked
+
+        if match.setup_expires_at is not None and now >= match.setup_expires_at:
+            _cancel_setup_locked(match, now=now, reason="setup_timeout")
+            return None, match, False
     _activate_countdown(match, now)
     if match.state not in {Match.State.ACTIVE, Match.State.FINISHING}:
         raise GameAPIError("match_not_active", "Match is not active.")
@@ -261,7 +267,13 @@ def _submit_guess(
     if participant.attempt_count >= rules.attempt_limit:
         raise GameAPIError("attempt_limit_reached", "Attempt limit has been reached.")
     adapter = adapter_for(rules.game_type)
-    serialized_secret = decrypt_secret(match.challenge.protected_secret)
+    challenge = (
+        Challenge.objects.filter(match=match, solver=participant).first()
+        or Challenge.objects.filter(match=match, solver__isnull=True).first()
+    )
+    if challenge is None:
+        raise GameAPIError("challenge_not_committed", "Your Challenge is not committed yet.")
+    serialized_secret = decrypt_secret(challenge.protected_secret)
     secret = adapter.decode_secret(rules, serialized_secret)
     try:
         canonical_guess, feedback, solved = adapter.evaluate(rules, secret, guess)
@@ -400,6 +412,12 @@ def refresh_match_state(
         raise GameAPIError(
             "permission_denied", "You are not a participant in this match.", status_code=403
         )
+    if match.state == Match.State.SETUP:
+        from apps.matches.challenges import _cancel_setup_locked
+
+        if match.setup_expires_at is not None and now >= match.setup_expires_at:
+            _cancel_setup_locked(match, now=now, reason="setup_timeout")
+            return match
     _activate_countdown(match, now)
     rules = rules_from_snapshot(match.rules)
     if match.state in {Match.State.ACTIVE, Match.State.FINISHING} and now >= match.deadline:
@@ -443,7 +461,11 @@ def abandon(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
         return match
-    if match.state in {Match.State.COUNTDOWN, Match.State.ACTIVE, Match.State.FINISHING}:
+    if match.state == Match.State.SETUP:
+        from apps.matches.challenges import _cancel_setup_locked
+
+        _cancel_setup_locked(match, now=now, reason="participant_left")
+    elif match.state in {Match.State.COUNTDOWN, Match.State.ACTIVE, Match.State.FINISHING}:
         participant.solve_state = Participant.SolveState.ABANDONED
         participant.save(update_fields=["solve_state"])
         match.state = Match.State.ABANDONED
@@ -500,7 +522,7 @@ def abandon(
             reason="abandoned",
             solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
         )
-    elif match.state != Match.State.ABANDONED:
+    elif match.state not in {Match.State.ABANDONED, Match.State.CANCELLED}:
         raise GameAPIError("match_not_active", "Only an active match can be abandoned.")
     CommandRecord.objects.create(
         guest=guest,

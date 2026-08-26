@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import GuestIdentity
 from apps.analytics.throttles import AnalyticsScopedRateThrottle
+from apps.matches.challenges import commit_challenge
 from apps.matches.errors import GameAPIError
 from apps.matches.models import Room, RoomMembership
 from apps.matches.projections import snapshot
@@ -22,6 +23,8 @@ from apps.matches.rooms import (
 )
 from apps.matches.serializers import (
     CommandSerializer,
+    CommitChallengeSerializer,
+    CreateRoomSerializer,
     CreateSoloSerializer,
     GuessSerializer,
     ReadySerializer,
@@ -112,12 +115,28 @@ class RematchView(APIView):
         return Response(room_snapshot(room), status=status.HTTP_202_ACCEPTED)
 
 
+class ChallengeCommitView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "match_create"
+
+    def post(self, request: Request, match_id: uuid.UUID) -> Response:
+        serializer = CommitChallengeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        match, created = commit_challenge(
+            guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+        )
+        return Response(
+            snapshot(match, authenticated_guest(request)),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
 class RoomCreateView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "match_create"
 
     def post(self, request: Request) -> Response:
-        serializer = CreateSoloSerializer(data=request.data)
+        serializer = CreateRoomSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         room, created = create_room(guest=authenticated_guest(request), **serializer.validated_data)
         return Response(

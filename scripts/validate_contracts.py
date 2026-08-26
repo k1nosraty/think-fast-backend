@@ -209,6 +209,7 @@ def validate_openapi(path: Path) -> None:
         "/rooms/{room_id}/ready/",
         "/rooms/{room_id}/start/",
         "/matches/{match_id}/guesses/",
+        "/matches/{match_id}/challenges/",
         "/matches/{match_id}/snapshot/",
         "/matches/{match_id}/leave/",
         "/matches/{match_id}/rematch/",

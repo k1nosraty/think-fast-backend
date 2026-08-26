@@ -18,7 +18,7 @@ through a recorded, versioned decision and compatible contract/preset update.
 | Friendly challenge | Same server-generated Secret for both players |
 | Room capacity | Exactly two active players in Social MVP |
 | History | Full accepted Guess history visible to its owner |
-| Expansion | Color Classic/Permutation in T6; player-authored Challenge and Word after T6 |
+| Expansion | Color in T6; player-authored Friendly Challenge in T7; Word remains gated after T7 spike |
 
 ## Number presets
 

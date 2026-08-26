@@ -10,7 +10,8 @@
     "type": {
       "enum": [
         "room.player_joined", "room.player_left", "room.ready_changed",
-        "match.countdown_started", "match.started", "guess.evaluated",
+        "challenge.setup_started", "challenge.committed", "challenge.setup_progress",
+        "challenge.setup_cancelled", "match.countdown_started", "match.started", "guess.evaluated",
         "opponent.guessed", "participant.solved", "participant.disconnected",
         "participant.reconnected", "match.finished", "rematch.requested",
         "rematch.accepted", "rematch.declined", "rematch.expired",

@@ -46,7 +46,7 @@ def expected_validation_error(guess: str, length: int) -> str | None:
 
 class ContractTest(unittest.TestCase):
     def test_all_manifest_fixtures_validate(self) -> None:
-        self.assertEqual(validator.validate_contracts(), 13)
+        self.assertEqual(validator.validate_contracts(), 16)
 
     def test_number_feedback_examples_are_semantically_correct(self) -> None:
         fixture = json.loads(
