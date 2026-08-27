@@ -17,6 +17,13 @@
   with exact target confirmation.
 - Capacity is approved only from the repeatable staging harness. Missing Docker,
   PostgreSQL, Redis or staging evidence is a blocker, never an assumed pass.
+- Redis-backed throttling fails open during a verified cache outage so durable
+  PostgreSQL commands and Snapshots remain available. This emits a degraded-
+  security warning; operators must disable new Match admission if abuse risk is
+  elevated. Readiness still fails until Redis recovers.
+- The Channels Redis pool is explicitly capacity-sized through
+  `REDIS_CHANNEL_MAX_CONNECTIONS` (default 4096) instead of inheriting the
+  redis-py default of 100 connections.
 - T8 refreshes patch baselines to Python 3.12.14, PostgreSQL 17.11 and Redis
   7.4.11; this supersedes only the older patch numbers in ADR 0005, not its
   platform/dependency policy.

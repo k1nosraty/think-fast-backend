@@ -10,8 +10,10 @@ Backend Tasks T0–T7 are complete. MVP contracts are frozen at
 The Room-to-rematch loop, safe playtest analytics, Color Classic and Color
 Permutation and safe player-authored Friendly challenges are implemented. The
 T7 Word spike is a documented production NO-GO pending licensed data evidence.
-T8 hardening is implemented as a release candidate, but Production Beta exit is
-blocked until the staging capacity and backup/restore register is measured.
+T8 hardening and the complete single-host validation baseline are complete.
+Production deployment approval remains blocked until the same operational gates
+are measured on the agreed production-like staging topology. T9 competitive
+planning is unblocked; this does not authorize a Production Beta release.
 
 ## MVP
 

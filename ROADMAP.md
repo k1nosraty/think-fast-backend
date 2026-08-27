@@ -16,8 +16,8 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T5 | Rematch and gameplay polish | **Complete** — play-rematch loop and safe playtest analytics |
 | T6 | Color expansion | **Complete** — Color Classic and Permutation use the shared match platform |
 | T7 | Challenge expansion | **Complete** — safe player-authored duel; Word remains gated after bounded spike |
-| T8 | Production beta | **Release candidate** — hardening/harness complete; staging load and restore evidence pending |
-| T9 | Competitive product | Ranked/matchmaking/progression only after MVP evidence |
+| T8 | Production beta | **Engineering complete** — hardening and local exit baseline pass; production-like staging approval remains pending |
+| T9 | Competitive product | **Ready for planning** — split Ranked/matchmaking/progression into bounded tasks before implementation |
 
 ## Release boundaries
 
@@ -45,13 +45,17 @@ implemented only if its validation/feedback spike passes explicit gates.
 ### Beta — T8
 
 Operations, security, retention, monitoring, backup/restore, and capacity are
-validated before external release.
+validated before external release. The single-host engineering baseline is
+complete; external release still requires evidence from the agreed
+production-like staging topology.
 
 ### Post-MVP — T9
 
 Ranked, rating, leaderboard, public matchmaking, achievements, party/team,
 spectators, tournaments, chat, cosmetics, and monetization require product data
-and separate execution plans.
+and separate execution plans. T9 planning may proceed from the accepted T8
+engineering baseline, but it does not waive the staging gate for Production
+Beta deployment.
 
 ## Phase exit rule
 

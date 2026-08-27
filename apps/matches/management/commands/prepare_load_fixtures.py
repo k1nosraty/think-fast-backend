@@ -32,6 +32,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--count", type=int, default=3000)
+        parser.add_argument("--start-index", type=int, default=0)
         parser.add_argument("--output", required=True)
 
     @transaction.atomic
@@ -39,8 +40,11 @@ class Command(BaseCommand):
         if not settings.LOAD_FIXTURES_ENABLED:
             raise CommandError("LOAD_FIXTURES_ENABLED=true is required")
         count = int(options["count"])
+        start_index = int(options["start_index"])
         if count < 1 or count > 10_000:
             raise CommandError("--count must be between 1 and 10000")
+        if start_index < 0 or start_index + count > len(ALPHABET) ** 6:
+            raise CommandError("--start-index range exceeds the join-code space")
         output = Path(str(options["output"])).resolve()
         if output.exists():
             raise CommandError("--output must not already exist")
@@ -52,17 +56,17 @@ class Command(BaseCommand):
         snapshot["match_deadline_seconds"] = 600
         now = timezone.now()
         rows: list[dict[str, str]] = []
-        for index in range(count):
+        for index in range(start_index, start_index + count):
             host_token = secrets.token_urlsafe(32)
             opponent_token = secrets.token_urlsafe(32)
             host = GuestIdentity.objects.create(
-                display_name=f"Load Host {index}",
+                display_name=f"LH-{index}",
                 avatar_id="avatar_01",
                 token_digest=GuestIdentity.digest_token(host_token),
                 expires_at=now + timedelta(hours=1),
             )
             opponent = GuestIdentity.objects.create(
-                display_name=f"Load Opponent {index}",
+                display_name=f"LO-{index}",
                 avatar_id="avatar_02",
                 token_digest=GuestIdentity.digest_token(opponent_token),
                 expires_at=now + timedelta(hours=1),

@@ -1,14 +1,32 @@
+import logging
 import uuid
 from typing import Any
 
+from redis.exceptions import RedisError
 from rest_framework.request import Request
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.analytics.service import record_analytics
 from apps.matches.models import Match
 
+logger = logging.getLogger("think_fast.throttle")
 
-class AnalyticsScopedRateThrottle(ScopedRateThrottle):
+
+class ResilientScopedRateThrottle(ScopedRateThrottle):
+    """Keep PostgreSQL-backed APIs available during a Redis cache outage."""
+
+    def allow_request(self, request: Request, view: Any) -> bool:
+        try:
+            return super().allow_request(request, view)
+        except (RedisError, OSError):
+            logger.warning(
+                "throttle.cache_unavailable",
+                extra={"context": {"scope": getattr(view, "throttle_scope", "unknown")}},
+            )
+            return True
+
+
+class AnalyticsScopedRateThrottle(ResilientScopedRateThrottle):
     """Record only aggregate metadata when the Guess rate limit blocks a request."""
 
     def allow_request(self, request: Request, view: Any) -> bool:

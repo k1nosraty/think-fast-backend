@@ -1,17 +1,17 @@
 from rest_framework import permissions, status
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import GuestIdentity
 from apps.accounts.serializers import CreateGuestSerializer
+from apps.analytics.throttles import ResilientScopedRateThrottle
 
 
 class GuestSessionCreateView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "guest_create"
 
     def post(self, request: Request) -> Response:

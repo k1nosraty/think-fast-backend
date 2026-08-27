@@ -8,6 +8,7 @@ const fixtures = new SharedArray("fixtures", () => JSON.parse(open(__ENV.LOAD_FI
 const profile = __ENV.PROFILE || "guess_sustained";
 const baseUrl = __ENV.BASE_URL;
 const wsUrl = baseUrl.replace(/^http/, "ws");
+const socketRampSeconds = Number(__ENV.SOCKET_RAMP_SECONDS || "30");
 
 const scenarios = {
   guess_sustained: {
@@ -18,7 +19,10 @@ const scenarios = {
     executor: "constant-arrival-rate", exec: "guess", rate: 300, timeUnit: "1s",
     duration: "30s", preAllocatedVUs: 400, maxVUs: 800,
   },
-  sockets_2000: {executor: "constant-vus", exec: "socketHold", vus: 2000, duration: "5m"},
+  sockets_2000: {
+    executor: "per-vu-iterations", exec: "socketHold", vus: 2000, iterations: 1,
+    maxDuration: "5m50s",
+  },
   reconnect_1000: {
     executor: "constant-arrival-rate", exec: "reconnect", rate: 17, timeUnit: "1s",
     duration: "60s", preAllocatedVUs: 100, maxVUs: 300,
@@ -50,7 +54,13 @@ export function guess() {
 }
 
 export function socketHold() {
-  const row = fixture();
+  // Each VU makes exactly one attempt and holds it. Retrying a failed upgrade
+  // in a tight loop masks the concurrent-socket count and can exhaust host FDs.
+  const row = fixtures[(__VU - 1) % fixtures.length];
+  // Establishing every connection at the same instant measures a handshake
+  // stampede, not stable socket capacity. Ramp deterministically without
+  // rotating identities or introducing retries.
+  sleep(((__VU - 1) / fixtures.length) * socketRampSeconds);
   const response = ws.connect(
     `${wsUrl}/ws/v1/matches/${row.match_id}/`,
     {headers: {Authorization: `Bearer ${row.token}`, Origin: baseUrl}},

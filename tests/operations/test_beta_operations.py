@@ -4,15 +4,36 @@ import uuid
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.test import Client, override_settings
 from django.utils import timezone
+from redis.exceptions import ConnectionError as RedisConnectionError
+from rest_framework.test import APIRequestFactory
 
+from apps.accounts.models import GuestIdentity
 from apps.analytics.models import OperationalAuditEvent
+from apps.analytics.throttles import ResilientScopedRateThrottle
 from apps.matches.models import Attempt, Challenge, Match, Result
 from tests.api.test_friendly_flow import command, guest
+
+
+def test_throttle_fails_open_without_redis_and_logs_degraded_security(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    request = APIRequestFactory().get("/api/v1/game-definitions/")
+    request.user = AnonymousUser()
+    view = SimpleNamespace(throttle_scope="game_read")
+    throttle = ResilientScopedRateThrottle()
+
+    with patch.object(throttle.cache, "get", side_effect=RedisConnectionError("unavailable")):
+        assert throttle.allow_request(request, view)
+
+    assert "throttle.cache_unavailable" in caplog.text
 
 
 @pytest.mark.django_db
@@ -116,3 +137,30 @@ def test_load_fixture_generation_is_explicit_and_private(tmp_path: Path) -> None
     assert set(rows[0]) == {"match_id", "token", "guess"}
     assert stat.S_IMODE(output.stat().st_mode) == 0o600
     assert Match.objects.filter(state=Match.State.ACTIVE).count() == 1
+
+    second_output = tmp_path / "load-second.json"
+    call_command(
+        "prepare_load_fixtures",
+        count=1,
+        start_index=1,
+        output=str(second_output),
+    )
+    assert Match.objects.filter(state=Match.State.ACTIVE).count() == 2
+
+
+@pytest.mark.django_db
+@override_settings(LOAD_FIXTURES_ENABLED=True)
+def test_load_fixture_generation_supports_large_isolated_offsets(tmp_path: Path) -> None:
+    output = tmp_path / "load-large-offset.json"
+
+    call_command(
+        "prepare_load_fixtures",
+        count=1,
+        start_index=899_999_999,
+        output=str(output),
+    )
+
+    guest_names = list(GuestIdentity.objects.values_list("display_name", flat=True))
+    assert output.exists()
+    assert guest_names == ["LH-899999999", "LO-899999999"]
+    assert all(len(name) <= 20 for name in guest_names)

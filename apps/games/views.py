@@ -1,16 +1,16 @@
 from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.analytics.throttles import ResilientScopedRateThrottle
 from apps.games.domain import PRESETS
 
 
 class GameDefinitionListView(APIView):
     authentication_classes: list[type] = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "game_read"
 
     def get(self, request: Request) -> Response:

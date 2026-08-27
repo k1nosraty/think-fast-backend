@@ -3,11 +3,10 @@ import uuid
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import GuestIdentity
-from apps.analytics.throttles import AnalyticsScopedRateThrottle
+from apps.analytics.throttles import AnalyticsScopedRateThrottle, ResilientScopedRateThrottle
 from apps.matches.challenges import commit_challenge
 from apps.matches.errors import GameAPIError
 from apps.matches.models import Room, RoomMembership
@@ -39,7 +38,7 @@ def authenticated_guest(request: Request) -> GuestIdentity:
 
 
 class SoloMatchCreateView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "match_create"
 
     def post(self, request: Request) -> Response:
@@ -79,7 +78,7 @@ class GuessCreateView(APIView):
 
 
 class SnapshotView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "snapshot"
 
     def get(self, request: Request, match_id: uuid.UUID) -> Response:
@@ -88,7 +87,7 @@ class SnapshotView(APIView):
 
 
 class LeaveView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "leave"
 
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
@@ -101,7 +100,7 @@ class LeaveView(APIView):
 
 
 class RematchView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "rematch"
 
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
@@ -116,7 +115,7 @@ class RematchView(APIView):
 
 
 class ChallengeCommitView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "challenge_commit"
 
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
@@ -132,7 +131,7 @@ class ChallengeCommitView(APIView):
 
 
 class RoomCreateView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "match_create"
 
     def post(self, request: Request) -> Response:
@@ -145,7 +144,7 @@ class RoomCreateView(APIView):
 
 
 class RoomDetailView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "snapshot"
 
     def get(self, request: Request, room_id: uuid.UUID) -> Response:
@@ -160,7 +159,7 @@ class RoomDetailView(APIView):
 
 
 class RoomJoinView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "room_command"
 
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
@@ -173,7 +172,7 @@ class RoomJoinView(APIView):
 
 
 class RoomReadyView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "room_command"
 
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
@@ -186,7 +185,7 @@ class RoomReadyView(APIView):
 
 
 class RoomStartView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "room_command"
 
     def post(self, request: Request, room_id: uuid.UUID) -> Response:
@@ -202,7 +201,7 @@ class RoomStartView(APIView):
 
 
 class RoomLeaveView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "room_command"
 
     def post(self, request: Request, room_id: uuid.UUID) -> Response:

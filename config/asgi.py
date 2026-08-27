@@ -8,10 +8,13 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 
-from apps.realtime.auth import GuestTokenAuthMiddleware
-from apps.realtime.routing import websocket_urlpatterns
-
 django_asgi_application = get_asgi_application()
+
+# Django's app registry must be initialized before application-owned middleware
+# imports models such as AnonymousUser.
+from apps.realtime.auth import GuestTokenAuthMiddleware  # noqa: E402
+from apps.realtime.routing import websocket_urlpatterns  # noqa: E402
+
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_application,

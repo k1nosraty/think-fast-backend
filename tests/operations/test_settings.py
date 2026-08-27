@@ -4,11 +4,20 @@ import sys
 
 from django.apps import apps
 
+from config.settings import base
+
 
 def test_expected_boundaries_are_registered() -> None:
     assert {
         apps.get_app_config(label).name for label in ("accounts", "games", "matches", "realtime")
     } == {"apps.accounts", "apps.games", "apps.matches", "apps.realtime"}
+
+
+def test_redis_channel_timeout_exceeds_the_blocking_receive_interval() -> None:
+    host = base.CHANNEL_LAYERS["default"]["CONFIG"]["hosts"][0]
+
+    assert host["socket_timeout"] >= 15
+    assert host["socket_connect_timeout"] >= 10
 
 
 def test_production_settings_refuse_missing_secrets() -> None:

@@ -86,7 +86,21 @@ CACHES = {
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [REDIS_URL]},
+        "CONFIG": {
+            "hosts": [
+                {
+                    "address": REDIS_URL,
+                    "max_connections": integer("REDIS_CHANNEL_MAX_CONNECTIONS", 4096),
+                    # redis-py 8 defaults to a five-second socket timeout, equal
+                    # to channels_redis's blocking-pop interval. Leave enough
+                    # margin for the response when the event loop is saturated.
+                    "socket_timeout": integer("REDIS_CHANNEL_SOCKET_TIMEOUT", 15),
+                    "socket_connect_timeout": integer(
+                        "REDIS_CHANNEL_CONNECT_TIMEOUT", 10
+                    ),
+                }
+            ]
+        },
     }
 }
 
@@ -95,7 +109,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
-    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_CLASSES": ["apps.analytics.throttles.ResilientScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {
         "guest_create": "20/hour",
         "game_read": "120/minute",

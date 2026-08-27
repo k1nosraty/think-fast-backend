@@ -1,8 +1,10 @@
 # Production beta operations
 
-This is the operator runbook and T8 evidence register. T8 code hardening is
-implemented, but the Production Beta exit remains **BLOCKED** until the staging
-rows marked `NOT RUN` are measured on the agreed topology.
+This is the operator runbook and T8 evidence register. T8 engineering and its
+single-host validation baseline are **COMPLETE**. Production Beta deployment
+approval remains **BLOCKED** until the staging column below is measured on the
+agreed topology. Local PASS proves the implementation and harness; it is not a
+public SLO or production capacity claim.
 
 ## Release sequence
 
@@ -52,8 +54,9 @@ errors report only exception type and view—not exception text or traceback.
 - Database readiness failure: stop new Match creation, preserve app logs, fail
   over/restore PostgreSQL, run migrations and smoke before reopening.
 - Redis failure: authoritative writes remain PostgreSQL-backed; expect realtime
-  degradation and outbox growth. Restore Redis, run `publish_outbox`, verify
-  resync, then clear the WebSocket kill switch.
+  degradation, fail-open HTTP throttling warnings and outbox growth. Disable new
+  Match admission when abuse risk is material. Restore Redis, run
+  `publish_outbox`, verify resync, then clear the WebSocket kill switch.
 - Secret/privacy incident: disable Match creation and player-authored setup,
   rotate exposed keys/credentials, preserve the audit hold, assess affected
   rows, and do not run ordinary deletion over evidence.
@@ -102,22 +105,62 @@ k6 run -e PROFILE=guess_sustained -e BASE_URL=https://staging.example \
 
 Run each profile against fresh fixtures: `guess_sustained`, `guess_burst`,
 `sockets_2000`, `reconnect_1000`. Capture k6 output, PostgreSQL/Redis resource
-graphs, replica count and commit/image digest.
+graphs, replica count and commit/image digest. Set
+`REDIS_CHANNEL_MAX_CONNECTIONS` above the expected per-process concurrent
+channel-operation peak; the checked-in baseline is 4096 for the 2,000-socket
+validation target. Keep `REDIS_CHANNEL_SOCKET_TIMEOUT` (default `15`) above
+the five-second blocking receive interval used by `channels_redis`; the connect
+timeout defaults to `10` seconds via `REDIS_CHANNEL_CONNECT_TIMEOUT`.
+
+On a clean Ubuntu 22.04/24.04 validation host, the complete automated runner is:
+
+```bash
+./scripts/run_t8_validation.sh
+```
+
+It installs missing prerequisites and writes
+`artifacts/t8-validation-<UTC timestamp>/report.md`. Send only that report plus
+the non-secret logs and infrastructure graphs; never send the generated load
+fixture because it contains temporary bearer tokens. By default the runner uses
+a single-host local stack, which proves the harness but cannot claim the agreed
+production-like capacity envelope. Set `BASE_URL`, `LOAD_FIXTURE_FILE` and the
+PostgreSQL variables to validate a real staging deployment.
 
 ## T8 validation register
 
-| Gate | Target | Current evidence |
-| --- | --- | --- |
-| Unit/contract/security | no failures, no known dependency vulnerability | Local automated gates available |
-| Production settings | Django deploy check clean | Local automated gate available |
-| Backup/restore | approved RPO/RTO | **NOT RUN — PostgreSQL/staging unavailable** |
-| 2,000 WebSockets | stable for 5 minutes | **NOT RUN** |
-| 1,000 active Friendly matches | no divergent durable state | **NOT RUN** |
-| Guess sustained | 100/s for 5 minutes, p95 < 300 ms | **NOT RUN** |
-| Guess burst | 300/s for 30 seconds | **NOT RUN** |
-| Reconnect storm | 1,000/60 seconds, no divergence | **NOT RUN** |
-| Redis failure/recovery | writes authoritative, outbox/resync recovers | Hermetic behavior tested; real Redis drill **NOT RUN** |
-| Deploy/restart | graceful reconnect and compatible rollback | Harness/runbook ready; staging drill **NOT RUN** |
+The local baseline is composed from one complete run and one selective retry
+against the same candidate (`c890c69`) on a two-core Ubuntu host:
 
-Production Beta approval requires attaching measured results and changing every
-required `NOT RUN` row to PASS. Do not infer capacity from unit-test speed.
+- `report(3).md`, run `20260827T082429Z`: all executed gates passed except the
+  image scan and 2,000-socket profile.
+- `report(8).md`, run `20260827T101905Z`: the corrected image scan and
+  2,000-socket profile both passed; unrelated successful gates were skipped.
+
+Generated bearer-token fixture files are intentionally excluded from evidence.
+Operational logs are retained outside Git according to the validation-host
+policy.
+
+| Gate | Target | Single-host local evidence | Production-like staging |
+| --- | --- | --- | --- |
+| Unit/contract/security | no failures, no known dependency vulnerability | **PASS** — quality and security suites | **NOT RUN** |
+| Production image/settings | deploy check, minimal inventory, clean vulnerability scan | **PASS** — build, inventory and Trivy scan | **NOT RUN** |
+| Smoke | beta endpoints and protected operations respond correctly | **PASS** | **NOT RUN** |
+| Backup/restore | approved RPO/RTO | **PASS** — isolated restore, measured local RTO `0s`, 30 migration rows | **NOT RUN** — local timing is not an approved RPO/RTO |
+| 2,000 WebSockets | stable for about 5 minutes | **PASS** — 2,000/2,000 upgrades, 0 interrupted, 4m55s hold, connect p95 574.31ms | **NOT RUN** |
+| Application file descriptors | no exhaustion or growth while sockets are held | **PASS** — peak/steady 2,021 of 65,536 soft limit; returned after close | **NOT RUN** |
+| 1,000 active Friendly matches | no divergent durable state | **PASS baseline** — 2,000 isolated active-match fixtures plus recovery/reconnect checks | **NOT RUN** |
+| Guess sustained | 100/s for 5 minutes, p95 < 300 ms | **PASS** — k6 thresholds satisfied | **NOT RUN** |
+| Guess burst | 300/s for 30 seconds | **PASS** — k6 thresholds satisfied | **NOT RUN** |
+| Reconnect storm | 1,000/60 seconds, no divergence | **PASS** — k6 and authenticated recovery checks | **NOT RUN** |
+| Redis failure/recovery | writes authoritative, outbox/resync recovers | **PASS** — real local Redis interruption, durable Snapshot and outbox recovery | **NOT RUN** |
+| Application restart/recovery | authenticated Snapshot survives ASGI restart | **PASS** | **NOT RUN** |
+
+### Evidence reuse and rerun rule
+
+A PASS from the complete baseline remains valid for documentation-only changes.
+Use `RETRY_GATES` to rerun only a failed or affected gate. Rerun an earlier PASS
+only when application behavior, dependencies, production settings, Docker
+contents, the relevant harness, or the target topology changed in a way that
+can affect it. A production deployment still requires attaching staging
+results and changing every required staging `NOT RUN` cell to PASS. Do not infer
+production capacity from this local baseline.

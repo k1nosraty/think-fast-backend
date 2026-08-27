@@ -186,12 +186,15 @@ are explicit and evidence-backed.
 
 **Effort:** Very high.
 
-**Status:** Release candidate on 2026-08-26, not accepted as Production Beta.
-Security, retention, observability, kill switches, audit, backup/restore,
-staging, smoke and capacity harnesses are implemented. Real PostgreSQL/Redis,
-backup/restore RPO/RTO and required staging load/failure/deploy drills remain
-mandatory evidence; see `docs/operations/README.md`. Do not start T9 from this
-status.
+**Status:** Engineering scope and single-host validation baseline complete on
+2026-08-27. Security, retention, observability, kill switches, audit,
+backup/restore, smoke, image scanning, capacity and failure/recovery harnesses
+all have recorded local PASS evidence. Production Beta deployment is not yet
+approved: repeat the applicable gates on the agreed production-like staging
+topology and attach infrastructure measurements; see
+`docs/operations/README.md`. T9 planning is now allowed, but this status does
+not waive the deployment gate or authorize competitive implementation before
+its plan is accepted.
 
 - Finalize security config, HTTPS/WSS, origin/host policy, throttles, admin least
   privilege, scanning, retention/deletion and audit.
@@ -209,7 +212,7 @@ feature kill switches are validated.
 
 ## T9 — Competitive planning gate, not one implementation task
 
-After beta evidence, design Ranked fixed RuleSets, matchmaking, rating,
+After the T8 engineering baseline, design Ranked fixed RuleSets, matchmaking, rating,
 leaderboard/seasons, anti-farming/multi-account/disconnect abuse, report/block,
 progression separation and capacity. Split the accepted plan into new bounded
 vertical tasks. Do not ask one AI agent to implement all competitive features.
