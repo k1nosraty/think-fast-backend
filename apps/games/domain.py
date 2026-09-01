@@ -2,7 +2,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, replace
 from typing import Literal
 
-FeedbackToken = Literal["exact", "present", "absent"]
+from apps.games.feedback import FeedbackToken, positional_feedback
 
 
 @dataclass(frozen=True)
@@ -103,20 +103,4 @@ def evaluate_number(
 ) -> tuple[list[FeedbackToken], bool]:
     validate_sequence(secret, rules)
     validate_sequence(guess, rules)
-    feedback: list[FeedbackToken | None] = [None] * len(secret)
-    remaining: Counter[str] = Counter()
-    for index, (secret_symbol, guess_symbol) in enumerate(zip(secret, guess, strict=True)):
-        if secret_symbol == guess_symbol:
-            feedback[index] = "exact"
-        else:
-            remaining[secret_symbol] += 1
-    for index, guess_symbol in enumerate(guess):
-        if feedback[index] == "exact":
-            continue
-        if remaining[guess_symbol] > 0:
-            feedback[index] = "present"
-            remaining[guess_symbol] -= 1
-        else:
-            feedback[index] = "absent"
-    result = [token for token in feedback if token is not None]
-    return result, all(token == "exact" for token in result)
+    return positional_feedback(secret, guess)

@@ -2,10 +2,11 @@
 
 import secrets as _secrets
 import unicodedata
-from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from typing import Literal
+
+from apps.games.feedback import positional_feedback
 
 WordFeedbackToken = Literal["exact", "present", "absent"]
 
@@ -65,23 +66,8 @@ class BoundedLexicon:
 def evaluate_word(secret: str, guess: str) -> tuple[list[WordFeedbackToken], bool]:
     if len(secret) != len(guess):
         raise WordSpikeError("invalid_guess_length")
-    feedback: list[WordFeedbackToken | None] = [None] * len(secret)
-    remaining: Counter[str] = Counter()
-    for index, (secret_symbol, guess_symbol) in enumerate(zip(secret, guess, strict=True)):
-        if secret_symbol == guess_symbol:
-            feedback[index] = "exact"
-        else:
-            remaining[secret_symbol] += 1
-    for index, guess_symbol in enumerate(guess):
-        if feedback[index] == "exact":
-            continue
-        if remaining[guess_symbol]:
-            feedback[index] = "present"
-            remaining[guess_symbol] -= 1
-        else:
-            feedback[index] = "absent"
-    result = [item for item in feedback if item is not None]
-    return result, all(item == "exact" for item in result)
+    tokens, solved = positional_feedback(secret, guess)
+    return tokens, solved
 
 
 @dataclass(frozen=True)

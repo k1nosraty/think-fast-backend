@@ -4,6 +4,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from apps.games.feedback import positional_feedback
+
 
 @dataclass(frozen=True)
 class ColorDefinition:
@@ -119,33 +121,13 @@ def validate_color_sequence(value: object, rules: ColorRules) -> list[str]:
     return guess
 
 
-def _position_tokens(secret: Sequence[str], guess: Sequence[str]) -> list[str]:
-    feedback: list[str | None] = [None] * len(secret)
-    remaining: Counter[str] = Counter()
-    for index, (secret_symbol, guess_symbol) in enumerate(zip(secret, guess, strict=True)):
-        if secret_symbol == guess_symbol:
-            feedback[index] = "exact"
-        else:
-            remaining[secret_symbol] += 1
-    for index, guess_symbol in enumerate(guess):
-        if feedback[index] == "exact":
-            continue
-        if remaining[guess_symbol] > 0:
-            feedback[index] = "present"
-            remaining[guess_symbol] -= 1
-        else:
-            feedback[index] = "absent"
-    return [item for item in feedback if item is not None]
-
-
 def evaluate_color(
     *, rules: ColorRules, secret: object, guess: object
 ) -> tuple[dict[str, object], bool]:
     canonical_secret = validate_color_sequence(secret, rules)
     canonical_guess = validate_color_sequence(guess, rules)
-    tokens = _position_tokens(canonical_secret, canonical_guess)
+    tokens, solved = positional_feedback(canonical_secret, canonical_guess)
     exact_count = tokens.count("exact")
-    solved = exact_count == rules.sequence_length
     if rules.feedback_policy == "positional":
         return {"kind": "positional", "positions": tokens}, solved
     if rules.feedback_policy == "aggregate":
