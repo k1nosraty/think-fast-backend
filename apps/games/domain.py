@@ -59,13 +59,18 @@ NUMBER_PRESETS = {
 }
 
 from apps.games.color import COLOR_PRESETS, ColorRules  # noqa: E402
+from apps.games.word_spike import WORD_PRESETS, WordRules  # noqa: E402
 
-PRESETS: dict[str, NumberRules | ColorRules] = {**NUMBER_PRESETS, **COLOR_PRESETS}
+PRESETS: dict[str, NumberRules | ColorRules | WordRules] = {
+    **NUMBER_PRESETS,
+    **COLOR_PRESETS,
+    **WORD_PRESETS,
+}
 
 
 def rules_for_mode(
     preset_id: str, mode: Literal["practice", "friendly"]
-) -> NumberRules | ColorRules | None:
+) -> NumberRules | ColorRules | WordRules | None:
     rules = PRESETS.get(preset_id)
     if rules is None:
         return None

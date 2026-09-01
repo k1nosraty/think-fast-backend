@@ -1,15 +1,14 @@
 # Think Fast Backend
 
 Authoritative backend for **Think Fast**, a fast competitive deduction game.
-Players solve number, color, and later word challenges in solo or realtime
-matches. The server owns rules, secrets, timing, accepted attempts, feedback,
-and results.
+Players solve number, color, and word challenges in solo or realtime matches.
+The server owns rules, secrets, timing, accepted attempts, feedback, and results.
 
 Backend Tasks T0–T7 are complete. MVP contracts are frozen at
 `v1.0.0-draft.1`; Solo Number and private realtime Friendly 1v1 are playable.
 The Room-to-rematch loop, safe playtest analytics, Color Classic and Color
-Permutation and safe player-authored Friendly challenges are implemented. The
-T7 Word spike is a documented production NO-GO pending licensed data evidence.
+Permutation and safe player-authored Friendly challenges are implemented. Word
+game support is registered with a placeholder lexicon (licensed data pending).
 T8 hardening and the complete single-host validation baseline are complete.
 Production deployment approval remains blocked until the same operational gates
 are measured on the agreed production-like staging topology. T9 competitive

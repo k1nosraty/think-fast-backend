@@ -1,9 +1,11 @@
 # T7 Word feasibility spike
 
-**Status:** CHANGE / NO-GO for production Word support on 2026-08-26.
+**Status:** IMPLEMENTED with placeholder lexicon (2026-09-01). Production launch
+blocked on licensed, curated Persian lexicon data.
 
-This is evidence for the T7 gate, not a shipped Game Type. `word` is not in the
-game registry, presets, REST creation surface or production RuleSet union.
+`word` is now registered in the game registry, presets, and RuleSet union with
+the `WordAdapter`. A placeholder lexicon of ~40 words is provided for development
+and testing. The full production lexicon is pending legal/product approval.
 
 ## Prototype decision
 

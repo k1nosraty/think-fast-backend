@@ -206,6 +206,7 @@ def test_game_definitions_match_frozen_presets() -> None:
         "number_brain_burner_6_v1",
         "color_classic_5_v1",
         "color_permutation_8_v1",
+        "word_classic_5_fa_v1",
     }
 
 

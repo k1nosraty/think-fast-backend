@@ -12,8 +12,15 @@ from apps.games.color import (
 )
 from apps.games.domain import GuessValidationError, NumberRules, evaluate_number, validate_sequence
 from apps.games.secrets import generate_number_secret
+from apps.games.word_spike import (
+    WordRules,
+    WordSpikeError,
+    evaluate_word,
+    generate_word_secret,
+    normalize_persian_word,
+)
 
-Rules = NumberRules | ColorRules
+Rules = NumberRules | ColorRules | WordRules
 
 
 class GameAdapter(Protocol):
@@ -99,3 +106,37 @@ def adapter_for(game_type: object) -> GameAdapter:
 
 def rules_from_snapshot(snapshot: dict[str, object]) -> Rules:
     return adapter_for(snapshot.get("game_type")).rules_from_snapshot(snapshot)
+
+
+class WordAdapter:
+    def __init__(self) -> None:
+        from apps.games.word_lexicon import get_placeholder_lexicon
+
+        self._lexicon = get_placeholder_lexicon()
+
+    def rules_from_snapshot(self, snapshot: dict[str, object]) -> Rules:
+        return WordRules(**{field.name: snapshot[field.name] for field in fields(WordRules)})  # type: ignore[arg-type]
+
+    def generate_secret(self, rules: Rules) -> object:
+        return generate_word_secret(cast(WordRules, rules), self._lexicon)
+
+    def encode_secret(self, rules: Rules, secret: object) -> str:
+        return normalize_persian_word(secret)
+
+    def decode_secret(self, rules: Rules, value: str) -> object:
+        return normalize_persian_word(value)
+
+    def evaluate(
+        self, rules: Rules, secret: object, guess: object
+    ) -> tuple[object, dict[str, object], bool]:
+        if not isinstance(guess, str):
+            raise WordSpikeError("invalid_symbol")
+        word_rules = cast(WordRules, rules)
+        canonical = normalize_persian_word(guess)
+        self._lexicon.validate(canonical, length=word_rules.sequence_length)
+        secret_canonical = cast(str, secret)
+        positions, solved = evaluate_word(secret=secret_canonical, guess=canonical)
+        return canonical, {"kind": "positional", "positions": positions}, solved
+
+
+REGISTRY["word"] = WordAdapter()

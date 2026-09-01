@@ -1,8 +1,10 @@
-"""Bounded T7 feasibility prototype; deliberately not registered as a Game Type."""
+"""Word game adapter: Persian Wordle-style evaluation with bounded lexicon."""
 
+import secrets as _secrets
 import unicodedata
 from collections import Counter
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 WordFeedbackToken = Literal["exact", "present", "absent"]
@@ -80,3 +82,55 @@ def evaluate_word(secret: str, guess: str) -> tuple[list[WordFeedbackToken], boo
             feedback[index] = "absent"
     result = [item for item in feedback if item is not None]
     return result, all(item == "exact" for item in result)
+
+
+@dataclass(frozen=True)
+class WordRules:
+    preset_id: str
+    game_type: Literal["word"]
+    match_mode: Literal["practice", "friendly"]
+    schema_version: int
+    evaluator_version: int
+    sequence_length: int
+    lexicon_version: str
+    alphabet: str
+    feedback_policy: Literal["positional"]
+    history_policy: dict[str, str]
+    match_deadline_seconds: int
+    attempt_limit: int
+
+    def snapshot(self) -> dict[str, object]:
+        return asdict(self)
+
+
+WORD_PRESETS = {
+    "word_classic_5_fa_v1": WordRules(
+        "word_classic_5_fa_v1",
+        "word",
+        "practice",
+        1,
+        1,
+        5,
+        "placeholder-v1",
+        "fa",
+        "positional",
+        {"type": "full"},
+        240,
+        15,
+    ),
+}
+
+
+def generate_word_secret(
+    rules: WordRules,
+    lexicon: "BoundedLexicon",
+    choice: Callable[[Sequence[str]], str] = _secrets.choice,
+) -> str:
+    candidates = [
+        entry.canonical
+        for entry in lexicon._entries.values()
+        if not entry.is_proper_name and len(entry.canonical) == rules.sequence_length
+    ]
+    if not candidates:
+        raise WordSpikeError("word_not_in_dictionary")
+    return choice(candidates)
