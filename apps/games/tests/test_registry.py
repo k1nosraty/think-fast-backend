@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from apps.games.color import ColorRules, ColorValidationError
@@ -44,7 +46,7 @@ def test_number_adapter_roundtrips_known_snapshot() -> None:
     restored = rules_from_snapshot(snapshot)
     assert isinstance(restored, NumberRules)
     assert restored.preset_id == "number_classic_5_v1"
-    assert adapter.generate_secret(restored).__len__() == restored.sequence_length
+    assert len(cast(str, adapter.generate_secret(restored))) == restored.sequence_length
 
 
 def test_color_adapter_rejects_malformed_json_secret() -> None:
@@ -71,4 +73,4 @@ def test_color_adapter_evaluates_and_roundtrips() -> None:
 def test_color_adapter_generates_valid_secret() -> None:
     rules = _color_rules()
     adapter = ColorAdapter()
-    assert len(adapter.generate_secret(rules)) == rules.sequence_length
+    assert len(cast(list[str], adapter.generate_secret(rules))) == rules.sequence_length
