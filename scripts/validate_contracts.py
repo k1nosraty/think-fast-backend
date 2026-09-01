@@ -18,6 +18,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
+# Keep in sync with apps/__init__.py CONTRACT_VERSION
+CONTRACT_VERSION = "v1.0.0-draft.1"
 
 
 class ContractValidationError(ValueError):
@@ -198,7 +200,7 @@ def validate_openapi(path: Path) -> None:
     document = load_json(path)
     if document.get("openapi") != "3.1.0":
         raise ContractValidationError("openapi.json: expected OpenAPI 3.1.0")
-    if document.get("info", {}).get("version") != "v1.0.0-draft.1":
+    if document.get("info", {}).get("version") != CONTRACT_VERSION:
         raise ContractValidationError("openapi.json: contract version mismatch")
     required_paths = {
         "/guest-sessions/",
@@ -247,7 +249,7 @@ def _assert_no_private_keys(value: Any, where: str) -> None:
 def validate_contracts() -> int:
     manifest_path = CONTRACTS / "manifest.json"
     manifest = load_json(manifest_path)
-    if manifest.get("contract_version") != "v1.0.0-draft.1":
+    if manifest.get("contract_version") != CONTRACT_VERSION:
         raise ContractValidationError("manifest: unexpected contract version")
     validate_openapi(CONTRACTS / manifest["openapi"])
 

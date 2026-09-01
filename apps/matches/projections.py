@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.utils import timezone
 
+from apps import CONTRACT_VERSION
 from apps.accounts.models import GuestIdentity
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret
@@ -80,7 +81,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
     participants = list(match.participants.all())
     role = "host" if match.room is not None and match.room.host_id == guest.id else "player"
     return {
-        "contract_version": "v1.0.0-draft.1",
+        "contract_version": CONTRACT_VERSION,
         "match_id": str(match.id),
         "room_id": str(match.room_id) if match.room_id else None,
         "state": match.state,

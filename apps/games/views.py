@@ -3,6 +3,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps import CONTRACT_VERSION
 from apps.analytics.throttles import ResilientScopedRateThrottle
 from apps.games.domain import PRESETS
 
@@ -22,4 +23,4 @@ class GameDefinitionListView(APIView):
             }
             for preset_id, rules in PRESETS.items()
         ]
-        return Response({"contract_version": "v1.0.0-draft.1", "definitions": definitions})
+        return Response({"contract_version": CONTRACT_VERSION, "definitions": definitions})

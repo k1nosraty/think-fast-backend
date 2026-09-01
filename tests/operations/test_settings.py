@@ -9,8 +9,15 @@ from config.settings import base
 
 def test_expected_boundaries_are_registered() -> None:
     assert {
-        apps.get_app_config(label).name for label in ("accounts", "games", "matches", "realtime")
-    } == {"apps.accounts", "apps.games", "apps.matches", "apps.realtime"}
+        apps.get_app_config(label).name
+        for label in ("accounts", "analytics", "games", "matches", "realtime")
+    } == {
+        "apps.accounts",
+        "apps.analytics",
+        "apps.games",
+        "apps.matches",
+        "apps.realtime",
+    }
 
 
 def test_redis_channel_timeout_exceeds_the_blocking_receive_interval() -> None:

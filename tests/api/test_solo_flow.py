@@ -8,6 +8,8 @@ from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps import CONTRACT_VERSION
+
 from apps.matches.models import Attempt, Challenge, Match, Result
 
 
@@ -200,7 +202,7 @@ def test_authentication_is_required() -> None:
 def test_game_definitions_match_frozen_presets() -> None:
     response = APIClient().get("/api/v1/game-definitions/")
     assert response.status_code == 200
-    assert response.data["contract_version"] == "v1.0.0-draft.1"
+    assert response.data["contract_version"] == CONTRACT_VERSION
     assert {item["preset_id"] for item in response.data["definitions"]} == {
         "number_classic_5_v1",
         "number_brain_burner_6_v1",
