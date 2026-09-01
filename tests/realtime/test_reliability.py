@@ -8,9 +8,9 @@ from asgiref.sync import async_to_sync, sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.utils import timezone
 
-from apps.matches.models import Attempt, Match, MatchEvent, Participant, Result
+from apps.matches.models import Attempt, Match, MatchEvent, Participant, Result, RoomEvent
 from apps.realtime.lifecycle import claim_connection, expire_disconnect_grace, release_connection
-from apps.realtime.publisher import publish_pending
+from apps.realtime.publisher import publish_match_event, publish_pending, publish_room_event
 from apps.realtime.recovery import sweep_reliability
 from config.asgi import application
 from tests.api.test_friendly_flow import active_match, command
@@ -164,6 +164,50 @@ def test_match_resync_replays_ordered_authorized_gap_only() -> None:
         await socket.disconnect()
 
     async_to_sync(scenario)()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_publish_is_idempotent_and_missing_layer_marks_outbox_retry() -> None:
+    _, _, started = active_match()
+    match_event = MatchEvent.objects.filter(match_id=started["match_id"]).order_by("sequence").first()
+    room_event = RoomEvent.objects.order_by("sequence").first()
+    assert match_event is not None and room_event is not None
+
+    assert publish_match_event(match_event.id) is True
+    assert publish_match_event(match_event.id) is True
+    assert publish_room_event(room_event.id) is True
+    assert publish_room_event(room_event.id) is True
+    match_event.refresh_from_db()
+    room_event.refresh_from_db()
+    assert match_event.published_at is not None
+    assert room_event.published_at is not None
+
+    MatchEvent.objects.filter(match_id=started["match_id"]).update(
+        published_at=None, publish_attempts=0, next_attempt_at=None, last_error=""
+    )
+    with patch("apps.realtime.publisher.get_channel_layer", return_value=None):
+        assert publish_match_event(match_event.id) is False
+    match_event.refresh_from_db()
+    assert match_event.publish_attempts >= 1
+    assert match_event.last_error == "RuntimeError"
+    assert match_event.next_attempt_at is not None
+
+    RoomEvent.objects.update(
+        published_at=None, publish_attempts=0, next_attempt_at=None, last_error=""
+    )
+    with patch("apps.realtime.publisher.get_channel_layer", return_value=FailingLayer()):
+        assert publish_room_event(room_event.id) is False
+    room_event.refresh_from_db()
+    assert room_event.publish_attempts >= 1
+    assert room_event.last_error == "ConnectionError"
+
+    RoomEvent.objects.update(
+        published_at=None, publish_attempts=0, next_attempt_at=None, last_error=""
+    )
+    with patch("apps.realtime.publisher.get_channel_layer", return_value=None):
+        assert publish_room_event(room_event.id) is False
+    room_event.refresh_from_db()
+    assert room_event.last_error == "RuntimeError"
 
 
 @pytest.mark.django_db(transaction=True)

@@ -30,9 +30,14 @@ from apps.realtime.publisher import record_event, record_room_event
 JOIN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
-def room_snapshot(room: Room) -> dict[str, object]:
+def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, object]:
     members = list(room.memberships.all())
     host_membership = next(member for member in members if member.guest_id == room.host_id)
+    viewer_membership = (
+        next((member for member in members if member.guest_id == guest.id), None)
+        if guest is not None
+        else None
+    )
     latest_match = room.matches.order_by("-created_at").first()
     proposal = (
         RematchProposal.objects.filter(Q(source_match=latest_match) | Q(new_match=latest_match))
@@ -45,6 +50,7 @@ def room_snapshot(room: Room) -> dict[str, object]:
         "room_id": str(room.id),
         "join_code": room.join_code,
         "host_participant_id": str(host_membership.id),
+        "viewer_participant_id": str(viewer_membership.id) if viewer_membership else None,
         "preset_id": room.preset_id,
         "challenge_source": room.challenge_source,
         "state": room.state,
@@ -405,4 +411,67 @@ def leave_room(*, guest: GuestIdentity, room_id: uuid.UUID, command_id: uuid.UUI
     remaining.save(update_fields=["ready"])
     room.state = Room.State.WAITING
     room.save(update_fields=["host", "state", "updated_at"])
+    return room
+
+
+def room_for_join_code(join_code: str) -> Room | None:
+    return Room.objects.filter(join_code=join_code.upper()).exclude(state=Room.State.CLOSED).first()
+
+
+@transaction.atomic
+def kick_member(
+    *, guest: GuestIdentity, room_id: uuid.UUID, target_participant_id: uuid.UUID
+) -> Room:
+    room = Room.objects.select_for_update().filter(pk=room_id).first()
+    if room is None:
+        raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
+    if room.host_id != guest.id:
+        raise GameAPIError("not_room_host", "Only the room host can kick.", status_code=403)
+    if room.state != Room.State.READY_CHECK:
+        raise GameAPIError("not_ready", "Room cannot be changed in its current state.")
+    target = RoomMembership.objects.filter(room=room, id=target_participant_id).first()
+    if target is None:
+        raise GameAPIError("member_not_found", "Member was not found.", status_code=404)
+    if target.guest_id == room.host_id:
+        raise GameAPIError("invalid_request", "The host cannot be kicked.", status_code=400)
+    host_member = RoomMembership.objects.get(room=room, guest=guest)
+    if target.id == host_member.id:
+        raise GameAPIError("invalid_request", "You cannot kick yourself.", status_code=400)
+    target.delete()
+    remaining = RoomMembership.objects.filter(room=room).first()
+    if remaining is not None:
+        remaining.ready = False
+        remaining.save(update_fields=["ready"])
+    record_room_event(
+        room=room,
+        event_type="room.player_left",
+        payload={"participant_id": str(target.id)},
+    )
+    room.state = Room.State.WAITING
+    room.save(update_fields=["state", "updated_at"])
+    return room
+
+
+@transaction.atomic
+def update_room_rules(
+    *, guest: GuestIdentity, room_id: uuid.UUID, preset_id: str
+) -> Room:
+    room = Room.objects.select_for_update().filter(pk=room_id).first()
+    if room is None:
+        raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
+    if room.host_id != guest.id:
+        raise GameAPIError("not_room_host", "Only the room host can change rules.", status_code=403)
+    if room.state not in {Room.State.WAITING, Room.State.READY_CHECK}:
+        raise GameAPIError("not_ready", "Rules can only change before the match starts.")
+    if rules_for_mode(preset_id, "friendly") is None:
+        raise GameAPIError("invalid_request", "Unknown preset_id.", status_code=400)
+    room.preset_id = preset_id
+    RoomMembership.objects.filter(room=room).update(ready=False)
+    room.state = Room.State.WAITING
+    room.save(update_fields=["preset_id", "state", "updated_at"])
+    record_room_event(
+        room=room,
+        event_type="room.rules_changed",
+        payload={"preset_id": preset_id},
+    )
     return room

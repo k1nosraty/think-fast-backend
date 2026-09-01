@@ -15,10 +15,13 @@ from apps.matches.rematches import rematch_command
 from apps.matches.rooms import (
     create_room,
     join_room,
+    kick_member,
     leave_room,
+    room_for_join_code,
     room_snapshot,
     set_ready,
     start_room,
+    update_room_rules,
 )
 from apps.matches.serializers import (
     CommandSerializer,
@@ -26,8 +29,10 @@ from apps.matches.serializers import (
     CreateRoomSerializer,
     CreateSoloSerializer,
     GuessSerializer,
+    KickMemberSerializer,
     ReadySerializer,
     RematchSerializer,
+    UpdateRoomRulesSerializer,
 )
 from apps.matches.services import abandon, create_solo, refresh_match_state, submit_guess
 
@@ -111,7 +116,9 @@ class RematchView(APIView):
             match_id=match_id,
             **serializer.validated_data,
         )
-        return Response(room_snapshot(room), status=status.HTTP_202_ACCEPTED)
+        return Response(
+            room_snapshot(room, authenticated_guest(request)), status=status.HTTP_202_ACCEPTED
+        )
 
 
 class ChallengeCommitView(APIView):
@@ -139,7 +146,8 @@ class RoomCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         room, created = create_room(guest=authenticated_guest(request), **serializer.validated_data)
         return Response(
-            room_snapshot(room), status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            room_snapshot(room, authenticated_guest(request)),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
 
@@ -155,7 +163,7 @@ class RoomDetailView(APIView):
             room=room, guest=authenticated_guest(request)
         ).exists():
             raise GameAPIError("permission_denied", "You are not a room member.", status_code=403)
-        return Response(room_snapshot(room))
+        return Response(room_snapshot(room, authenticated_guest(request)))
 
 
 class RoomJoinView(APIView):
@@ -168,7 +176,7 @@ class RoomJoinView(APIView):
         room, _ = join_room(
             guest=authenticated_guest(request), room_id=room_id, **serializer.validated_data
         )
-        return Response(room_snapshot(room))
+        return Response(room_snapshot(room, authenticated_guest(request)))
 
 
 class RoomReadyView(APIView):
@@ -181,7 +189,7 @@ class RoomReadyView(APIView):
         room = set_ready(
             guest=authenticated_guest(request), room_id=room_id, **serializer.validated_data
         )
-        return Response(room_snapshot(room))
+        return Response(room_snapshot(room, authenticated_guest(request)))
 
 
 class RoomStartView(APIView):
@@ -210,4 +218,45 @@ class RoomLeaveView(APIView):
         room = leave_room(
             guest=authenticated_guest(request), room_id=room_id, **serializer.validated_data
         )
-        return Response({"state": "closed"} if room is None else room_snapshot(room))
+        return Response(
+            {"state": "closed"}
+            if room is None
+            else room_snapshot(room, authenticated_guest(request))
+        )
+
+
+class RoomByCodeView(APIView):
+    throttle_classes = [ResilientScopedRateThrottle]
+    throttle_scope = "snapshot"
+
+    def get(self, request: Request, join_code: str) -> Response:
+        room = room_for_join_code(join_code)
+        if room is None:
+            raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
+        return Response(room_snapshot(room, authenticated_guest(request)))
+
+
+class RoomKickView(APIView):
+    throttle_classes = [ResilientScopedRateThrottle]
+    throttle_scope = "room_command"
+
+    def post(self, request: Request, room_id: uuid.UUID) -> Response:
+        serializer = KickMemberSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        room = kick_member(
+            guest=authenticated_guest(request), room_id=room_id, **serializer.validated_data
+        )
+        return Response(room_snapshot(room, authenticated_guest(request)))
+
+
+class RoomRulesView(APIView):
+    throttle_classes = [ResilientScopedRateThrottle]
+    throttle_scope = "room_command"
+
+    def post(self, request: Request, room_id: uuid.UUID) -> Response:
+        serializer = UpdateRoomRulesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        room = update_room_rules(
+            guest=authenticated_guest(request), room_id=room_id, **serializer.validated_data
+        )
+        return Response(room_snapshot(room, authenticated_guest(request)))

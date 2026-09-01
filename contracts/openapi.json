@@ -5,7 +5,11 @@
     "version": "v1.0.0-draft.1",
     "description": "Frozen T0 contract baseline. Operations are implemented in later Backend tasks."
   },
-  "servers": [{"url": "/api/v1"}],
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
   "paths": {
     "/guest-sessions/": {
       "post": {
@@ -15,17 +19,29 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {"$ref": "#/components/schemas/CreateGuestSession"}
+              "schema": {
+                "$ref": "#/components/schemas/CreateGuestSession"
+              }
             }
           }
         },
         "responses": {
           "201": {
             "description": "Guest identity created",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GuestSession"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestSession"
+                }
+              }
+            }
           },
-          "400": {"$ref": "#/components/responses/ApiError"},
-          "429": {"$ref": "#/components/responses/ApiError"}
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -41,10 +57,20 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["contract_version", "definitions"],
+                  "required": [
+                    "contract_version",
+                    "definitions"
+                  ],
                   "properties": {
-                    "contract_version": {"const": "v1.0.0-draft.1"},
-                    "definitions": {"type": "array", "items": {"$ref": "#/components/schemas/GameDefinition"}}
+                    "contract_version": {
+                      "const": "v1.0.0-draft.1"
+                    },
+                    "definitions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GameDefinition"
+                      }
+                    }
                   }
                 }
               }
@@ -57,7 +83,11 @@
       "post": {
         "operationId": "createSoloMatch",
         "summary": "Create and activate a Solo Number match",
-        "security": [{"guestBearer": []}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -65,10 +95,23 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["command_id", "preset_id"],
+                "required": [
+                  "command_id",
+                  "preset_id"
+                ],
                 "properties": {
-                  "command_id": {"type": "string", "format": "uuid"},
-                  "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1", "color_classic_5_v1", "color_permutation_8_v1"]}
+                  "command_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "preset_id": {
+                    "enum": [
+                      "number_classic_5_v1",
+                      "number_brain_burner_6_v1",
+                      "color_classic_5_v1",
+                      "color_permutation_8_v1"
+                    ]
+                  }
                 }
               }
             }
@@ -77,16 +120,36 @@
         "responses": {
           "201": {
             "description": "Solo match created",
-            "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
           },
           "200": {
             "description": "Existing Solo match returned for the same command ID",
-            "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
           },
-          "400": {"$ref": "#/components/responses/ApiError"},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"},
-          "429": {"$ref": "#/components/responses/ApiError"}
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -94,22 +157,51 @@
       "post": {
         "operationId": "createRoom",
         "summary": "Create a private Friendly room",
-        "security": [{"guestBearer": []}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {"schema": {"$ref": "#/components/schemas/CreateRoomCommand"}}
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoomCommand"
+              }
+            }
           }
         },
         "responses": {
           "201": {
             "description": "Room created",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
           },
-          "200": {"description": "Existing Room returned for the same command ID", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
-          "400": {"$ref": "#/components/responses/ApiError"},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "429": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Existing Room returned for the same command ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -117,13 +209,36 @@
       "get": {
         "operationId": "getRoomSnapshot",
         "summary": "Get an authorized Room snapshot for lobby recovery",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
         "responses": {
-          "200": {"description": "Authorized Room snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "404": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Authorized Room snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -131,18 +246,49 @@
       "post": {
         "operationId": "joinRoom",
         "summary": "Join a private room after resolving its invite code",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandIdentity"
+              }
+            }
+          }
         },
         "responses": {
-          "200": {"description": "Joined", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "404": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"},
-          "429": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Joined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -150,26 +296,61 @@
       "post": {
         "operationId": "setRoomReady",
         "summary": "Set participant readiness for the current rules",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "allOf": [
-                  {"$ref": "#/components/schemas/CommandIdentity"},
-                  {"type": "object", "required": ["ready"], "properties": {"ready": {"type": "boolean"}}}
+                  {
+                    "$ref": "#/components/schemas/CommandIdentity"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "ready"
+                    ],
+                    "properties": {
+                      "ready": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
                 ]
               }
             }
           }
         },
         "responses": {
-          "200": {"description": "Readiness updated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "404": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Readiness updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -177,15 +358,56 @@
       "post": {
         "operationId": "startRoomMatch",
         "summary": "Freeze room rules/participants and start countdown",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}},
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandIdentity"
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {"description": "Match created", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
-          "200": {"description": "Existing Match returned for the same command ID", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"}
+          "201": {
+            "description": "Match created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Existing Match returned for the same command ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -193,15 +415,42 @@
       "post": {
         "operationId": "leaveRoom",
         "summary": "Leave a waiting room and transfer host ownership when required",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/RoomId"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}},
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandIdentity"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {"description": "Room membership removed; returns the updated Room or closed state"},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "404": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Room membership removed; returns the updated Room or closed state"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -209,20 +458,62 @@
       "post": {
         "operationId": "submitGuess",
         "summary": "Submit an idempotent Guess command",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/MatchId"}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MatchId"
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": {"application/json": {"schema": {"$ref": "./schemas/guess-command.schema.json"}}}
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/guess-command.schema.json"
+              }
+            }
+          }
         },
         "responses": {
-          "201": {"description": "Guess accepted as an Attempt", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AttemptOutcome"}}}},
-          "200": {"description": "Existing outcome returned for the same command ID", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AttemptOutcome"}}}},
-          "400": {"$ref": "#/components/responses/ApiError"},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"},
-          "429": {"$ref": "#/components/responses/ApiError"}
+          "201": {
+            "description": "Guess accepted as an Attempt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptOutcome"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Existing outcome returned for the same command ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -230,19 +521,59 @@
       "post": {
         "operationId": "commitPlayerChallenge",
         "summary": "Commit an immutable Secret for the other participant",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/MatchId"}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MatchId"
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommitChallengeCommand"}}}
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitChallengeCommand"
+              }
+            }
+          }
         },
         "responses": {
-          "201": {"description": "Challenge committed", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
-          "200": {"description": "Idempotent replay", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
-          "400": {"$ref": "#/components/responses/ApiError"},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"}
+          "201": {
+            "description": "Challenge committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -250,13 +581,36 @@
       "get": {
         "operationId": "getMatchSnapshot",
         "summary": "Get viewer-authorized state for load or recovery",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/MatchId"}],
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MatchId"
+          }
+        ],
         "responses": {
-          "200": {"description": "Authorized snapshot", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "404": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Authorized snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -264,15 +618,49 @@
       "post": {
         "operationId": "leaveMatch",
         "summary": "Leave or abandon a Match according to its state",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/MatchId"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommandIdentity"}}}},
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MatchId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandIdentity"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {"description": "Updated viewer snapshot", "content": {"application/json": {"schema": {"$ref": "./schemas/snapshot.schema.json"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "403": {"$ref": "#/components/responses/ApiError"},
-          "404": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"}
+          "200": {
+            "description": "Updated viewer snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     },
@@ -280,98 +668,394 @@
       "post": {
         "operationId": "requestRematch",
         "summary": "Request, accept, or decline a new Match in the existing Room",
-        "security": [{"guestBearer": []}],
-        "parameters": [{"$ref": "#/components/parameters/MatchId"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RematchCommand"}}}},
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MatchId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RematchCommand"
+              }
+            }
+          }
+        },
         "responses": {
-          "202": {"description": "Rematch request recorded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoomSnapshot"}}}},
-          "401": {"$ref": "#/components/responses/ApiError"},
-          "409": {"$ref": "#/components/responses/ApiError"}
+          "202": {
+            "description": "Rematch request recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/rooms/by-code/{join_code}/": {
+      "get": {
+        "operationId": "lookupRoomByCode",
+        "summary": "Resolve an invite join code to a Room without joining",
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "join_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NP-Z2-9]{6}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/rooms/{room_id}/kick/": {
+      "post": {
+        "operationId": "kickRoomMember",
+        "summary": "Host kicks a non-host member from the Room",
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KickMemberCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Member removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/rooms/{room_id}/rules/": {
+      "post": {
+        "operationId": "updateRoomRules",
+        "summary": "Host changes the Room rules before the match starts",
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoomRulesCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rules updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
         }
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "guestBearer": {"type": "http", "scheme": "bearer", "bearerFormat": "opaque-guest-token"}
+      "guestBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque-guest-token"
+      }
     },
     "parameters": {
-      "RoomId": {"name": "room_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
-      "MatchId": {"name": "match_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+      "RoomId": {
+        "name": "room_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "MatchId": {
+        "name": "match_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
     },
     "responses": {
       "ApiError": {
         "description": "Stable API error",
-        "content": {"application/json": {"schema": {"$ref": "./schemas/error.schema.json"}}}
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "./schemas/error.schema.json"
+            }
+          }
+        }
       }
     },
     "schemas": {
       "CommandIdentity": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["command_id"],
-        "properties": {"command_id": {"type": "string", "format": "uuid"}}
+        "required": [
+          "command_id"
+        ],
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "RematchCommand": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["command_id"],
+        "required": [
+          "command_id"
+        ],
         "properties": {
-          "command_id": {"type": "string", "format": "uuid"},
-          "action": {"enum": ["request", "decline"], "default": "request"}
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "enum": [
+              "request",
+              "decline"
+            ],
+            "default": "request"
+          }
         }
       },
       "CreateGuestSession": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["display_name", "avatar_id"],
+        "required": [
+          "display_name",
+          "avatar_id"
+        ],
         "properties": {
-          "display_name": {"type": "string", "minLength": 3, "maxLength": 20},
-          "avatar_id": {"type": "string", "minLength": 1}
+          "display_name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 20
+          },
+          "avatar_id": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "GuestSession": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["guest_id", "display_name", "avatar_id", "access_token", "expires_at"],
+        "required": [
+          "guest_id",
+          "display_name",
+          "avatar_id",
+          "access_token",
+          "expires_at"
+        ],
         "properties": {
-          "guest_id": {"type": "string", "format": "uuid"},
-          "display_name": {"type": "string"},
-          "avatar_id": {"type": "string"},
-          "access_token": {"type": "string"},
-          "expires_at": {"type": "string", "format": "date-time"}
+          "guest_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "avatar_id": {
+            "type": "string"
+          },
+          "access_token": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "GameDefinition": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["preset_id", "display_name_key", "rules"],
+        "required": [
+          "preset_id",
+          "display_name_key",
+          "rules"
+        ],
         "properties": {
-          "preset_id": {"type": "string"},
-          "display_name_key": {"type": "string"},
-          "rules": {"$ref": "./schemas/ruleset.schema.json"}
+          "preset_id": {
+            "type": "string"
+          },
+          "display_name_key": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "./schemas/ruleset.schema.json"
+          }
         }
       },
       "CreateRoomCommand": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["command_id", "preset_id"],
+        "required": [
+          "command_id",
+          "preset_id"
+        ],
         "properties": {
-          "command_id": {"type": "string", "format": "uuid"},
-          "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1", "color_classic_5_v1", "color_permutation_8_v1"]},
-          "challenge_source": {"enum": ["system", "players"], "default": "system"}
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preset_id": {
+            "enum": [
+              "number_classic_5_v1",
+              "number_brain_burner_6_v1",
+              "color_classic_5_v1",
+              "color_permutation_8_v1"
+            ]
+          },
+          "challenge_source": {
+            "enum": [
+              "system",
+              "players"
+            ],
+            "default": "system"
+          }
         }
       },
       "CommitChallengeCommand": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["command_id", "secret"],
+        "required": [
+          "command_id",
+          "secret"
+        ],
         "properties": {
-          "command_id": {"type": "string", "format": "uuid"},
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "secret": {
             "oneOf": [
-              {"type": "string", "pattern": "^[0-9]{5,6}$"},
-              {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+              {
+                "type": "string",
+                "pattern": "^[0-9]{5,6}$"
+              },
+              {
+                "type": "array",
+                "minItems": 5,
+                "maxItems": 8,
+                "items": {
+                  "type": "string"
+                }
+              }
             ]
           }
         }
@@ -379,38 +1063,137 @@
       "RoomSnapshot": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["room_id", "join_code", "host_participant_id", "preset_id", "challenge_source", "state", "latest_sequence", "latest_match_id", "rematch", "members"],
+        "required": [
+          "room_id",
+          "join_code",
+          "host_participant_id",
+          "preset_id",
+          "challenge_source",
+          "state",
+          "latest_sequence",
+          "latest_match_id",
+          "rematch",
+          "members",
+          "viewer_participant_id"
+        ],
         "properties": {
-          "room_id": {"type": "string", "format": "uuid"},
-          "join_code": {"type": "string", "pattern": "^[A-HJ-NP-Z2-9]{6}$"},
-          "host_participant_id": {"type": "string", "format": "uuid"},
-          "preset_id": {"type": "string"},
-          "challenge_source": {"enum": ["system", "players"]},
-          "state": {"enum": ["waiting", "ready_check", "countdown", "active", "closed"]},
-          "latest_sequence": {"type": "integer", "minimum": 0},
-          "latest_match_id": {"type": ["string", "null"], "format": "uuid"},
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "join_code": {
+            "type": "string",
+            "pattern": "^[A-HJ-NP-Z2-9]{6}$"
+          },
+          "host_participant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "viewer_participant_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "preset_id": {
+            "type": "string"
+          },
+          "challenge_source": {
+            "enum": [
+              "system",
+              "players"
+            ]
+          },
+          "state": {
+            "enum": [
+              "waiting",
+              "ready_check",
+              "countdown",
+              "active",
+              "closed"
+            ]
+          },
+          "latest_sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "latest_match_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "rematch": {
-            "type": ["object", "null"],
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": false,
-            "required": ["state", "requester_participant_id", "expires_at", "new_match_id"],
+            "required": [
+              "state",
+              "requester_participant_id",
+              "expires_at",
+              "new_match_id"
+            ],
             "properties": {
-              "state": {"enum": ["pending", "accepted", "declined", "expired"]},
-              "requester_participant_id": {"type": "string", "format": "uuid"},
-              "expires_at": {"type": "string", "format": "date-time"},
-              "new_match_id": {"type": ["string", "null"], "format": "uuid"}
+              "state": {
+                "enum": [
+                  "pending",
+                  "accepted",
+                  "declined",
+                  "expired"
+                ]
+              },
+              "requester_participant_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "new_match_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              }
             }
           },
           "members": {
-            "type": "array", "minItems": 1, "maxItems": 2,
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
             "items": {
-              "type": "object", "additionalProperties": false,
-              "required": ["participant_id", "display_name", "avatar_id", "ready", "connected"],
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "participant_id",
+                "display_name",
+                "avatar_id",
+                "ready",
+                "connected"
+              ],
               "properties": {
-                "participant_id": {"type": "string", "format": "uuid"},
-                "display_name": {"type": "string"},
-                "avatar_id": {"type": "string"},
-                "ready": {"type": "boolean"},
-                "connected": {"type": "boolean"}
+                "participant_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "avatar_id": {
+                  "type": "string"
+                },
+                "ready": {
+                  "type": "boolean"
+                },
+                "connected": {
+                  "type": "boolean"
+                }
               }
             }
           }
@@ -419,15 +1202,70 @@
       "AttemptOutcome": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["command_id", "attempt_id", "ordinal", "feedback", "solved", "match_state", "latest_sequence"],
+        "required": [
+          "command_id",
+          "attempt_id",
+          "ordinal",
+          "feedback",
+          "solved",
+          "match_state",
+          "latest_sequence"
+        ],
         "properties": {
-          "command_id": {"type": "string", "format": "uuid"},
-          "attempt_id": {"type": "string", "format": "uuid"},
-          "ordinal": {"type": "integer", "minimum": 1},
-          "feedback": {"$ref": "./schemas/feedback.schema.json"},
-          "solved": {"type": "boolean"},
-          "match_state": {"enum": ["active", "finishing", "finished"]},
-          "latest_sequence": {"type": "integer", "minimum": 0}
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "feedback": {
+            "$ref": "./schemas/feedback.schema.json"
+          },
+          "solved": {
+            "type": "boolean"
+          },
+          "match_state": {
+            "enum": [
+              "active",
+              "finishing",
+              "finished"
+            ]
+          },
+          "latest_sequence": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "KickMemberCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target_participant_id"
+        ],
+        "properties": {
+          "target_participant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UpdateRoomRulesCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "preset_id"
+        ],
+        "properties": {
+          "preset_id": {
+            "type": "string"
+          }
         }
       }
     }

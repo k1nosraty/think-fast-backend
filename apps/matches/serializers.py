@@ -25,6 +25,14 @@ class ReadySerializer(CommandSerializer):
     ready = serializers.BooleanField()
 
 
+class KickMemberSerializer(serializers.Serializer[dict[str, object]]):
+    target_participant_id = serializers.UUIDField()
+
+
+class UpdateRoomRulesSerializer(serializers.Serializer[dict[str, object]]):
+    preset_id = serializers.ChoiceField(choices=list(PRESETS))
+
+
 class RematchSerializer(CommandSerializer):
     action = serializers.ChoiceField(choices=["request", "decline"], default="request")
 
