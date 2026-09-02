@@ -27,12 +27,13 @@ upgrade policy.
 | Module | Owns |
 | --- | --- |
 | accounts | guest/user identity, profile snapshot, account upgrade |
+| analytics | privacy-safe product analytics, event recording, resilient throttling |
 | games | game definitions, RuleSet validation, secure generation ports, pure evaluators |
 | matches | rooms, participants, challenges, attempts, lifecycle, result, use cases |
 | realtime | consumers, subscriptions, event/snapshot delivery adapters |
 
-Competition, progression, social, moderation, and analytics are added only by a
-roadmap task. A conceptual boundary does not require a premature Django app.
+Competition, progression, social, and moderation are added only by a roadmap
+task. A conceptual boundary does not require a premature Django app.
 
 ## Write path: submit Guess
 

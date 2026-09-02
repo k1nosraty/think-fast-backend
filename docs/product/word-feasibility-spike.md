@@ -50,7 +50,7 @@ must be assigned before ingestion.
 `uv run pytest apps/games/tests/test_word_spike.py --no-cov` covers Arabic/Persian
 variants, diacritics, spacing/ZWNJ, invalid scripts, unknown words, proper names,
 blocked terms and duplicate-safe feedback. On the T7 development container,
-`uv run python scripts/benchmark_word_spike.py` ran 100,000 four-letter
+`uv run python experiments/benchmark_word_spike.py` ran 100,000 four-letter
 evaluations at 0.002013 ms median and 0.002103 ms p95 (max 0.304929 ms). Pure
 feedback latency is therefore not the blocker; production dictionary lookup,
 cache and moderation were not measured.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repeatable local latency probe for the non-production T7 Word prototype."""
+"""Repeatable local latency probe for the non-production Word prototype."""
 
 from __future__ import annotations
 
