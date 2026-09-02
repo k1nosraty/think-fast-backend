@@ -1,4 +1,4 @@
-"""Project and operational routes. Product routes begin in T2."""
+"""Project, operational, and HTTP API route configuration."""
 
 from django.contrib import admin
 from django.urls import path

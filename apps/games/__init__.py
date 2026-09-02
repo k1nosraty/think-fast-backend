@@ -1,1 +1,1 @@
-"""Game rules and pure evaluator boundary; no T1 gameplay implementation."""
+"""Game rules, pure evaluators, and game definitions boundary."""

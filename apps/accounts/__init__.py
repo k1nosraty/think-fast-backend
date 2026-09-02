@@ -1,1 +1,1 @@
-"""Identity boundary; implementation begins only when an assigned task requires it."""
+"""Guest identity, authentication, and account lifecycle boundary."""

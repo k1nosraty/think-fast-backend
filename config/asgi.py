@@ -1,4 +1,4 @@
-"""ASGI entrypoint for HTTP and the empty T1 WebSocket boundary."""
+"""ASGI entrypoint routing HTTP and WebSocket traffic."""
 
 import os
 

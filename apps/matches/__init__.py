@@ -1,1 +1,1 @@
-"""Match orchestration boundary; no T1 domain implementation."""
+"""Room, match, challenge, attempt, and result orchestration boundary."""

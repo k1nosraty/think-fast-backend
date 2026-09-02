@@ -1,1 +1,1 @@
-"""Realtime transport boundary; no T1 consumers or events."""
+"""Realtime transport authentication, subscription, and delivery boundary."""
