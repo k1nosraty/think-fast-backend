@@ -11,7 +11,7 @@ from apps.matches.errors import GameAPIError
 from apps.matches.features import require_match_creation
 from apps.matches.models import CommandRecord, Match, RematchProposal, Room, RoomMembership
 from apps.matches.rooms import _create_friendly_match
-from apps.matches.services import fingerprint
+from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_room_event
 
 
@@ -63,13 +63,11 @@ def rematch_command(
     if membership is None or not match.participants.filter(guest=guest).exists():
         raise GameAPIError("permission_denied", "You are not a match participant.", status_code=403)
     request_hash = fingerprint({"match_id": str(match_id), "action": action})
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior:
-        if (
-            prior.operation != "rematch"
-            or prior.request_fingerprint != request_hash
-            or prior.match_id != match.id
-        ):
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="rematch", request_hash=request_hash
+    )
+    if prior is not None:
+        if prior.match_id != match.id:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )

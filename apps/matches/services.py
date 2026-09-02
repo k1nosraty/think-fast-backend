@@ -34,6 +34,23 @@ def fingerprint(payload: dict[str, object]) -> str:
     ).hexdigest()
 
 
+def check_command_prior(
+    *,
+    guest: GuestIdentity,
+    command_id: uuid.UUID,
+    operation: str,
+    request_hash: str,
+) -> CommandRecord | None:
+    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
+    if prior is not None and (
+        prior.operation != operation or prior.request_fingerprint != request_hash
+    ):
+        raise GameAPIError(
+            "idempotency_conflict", "Command ID was already used with a different request."
+        )
+    return prior
+
+
 @transaction.atomic
 def create_solo(
     *,
@@ -45,17 +62,11 @@ def create_solo(
     require_match_creation()
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
     request_hash = fingerprint({"preset_id": preset_id})
-    prior = (
-        CommandRecord.objects.select_related("match")
-        .filter(guest=guest, command_id=command_id)
-        .first()
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="create_solo", request_hash=request_hash
     )
-    if prior:
-        if (
-            prior.operation != "create_solo"
-            or prior.request_fingerprint != request_hash
-            or prior.match is None
-        ):
+    if prior is not None:
+        if prior.match is None:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
@@ -452,13 +463,11 @@ def abandon(
             "permission_denied", "You are not a participant in this match.", status_code=403
         )
     request_hash = fingerprint({})
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior:
-        if (
-            prior.operation != "abandon"
-            or prior.request_fingerprint != request_hash
-            or prior.match_id != match.id
-        ):
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="abandon", request_hash=request_hash
+    )
+    if prior is not None:
+        if prior.match_id != match.id:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )

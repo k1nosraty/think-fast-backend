@@ -24,7 +24,7 @@ from apps.matches.models import (
     Room,
     RoomMembership,
 )
-from apps.matches.services import fingerprint
+from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_event, record_room_event
 
 JOIN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -177,17 +177,11 @@ def create_room(
         require_player_authored_challenges()
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
     request_hash = fingerprint({"preset_id": preset_id, "challenge_source": challenge_source})
-    prior = (
-        CommandRecord.objects.select_related("room")
-        .filter(guest=guest, command_id=command_id)
-        .first()
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="create_room", request_hash=request_hash
     )
-    if prior:
-        if (
-            prior.operation != "create_room"
-            or prior.request_fingerprint != request_hash
-            or prior.room is None
-        ):
+    if prior is not None:
+        if prior.room is None:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
@@ -231,13 +225,11 @@ def join_room(
     if room is None:
         raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
     request_hash = fingerprint({"room_id": str(room_id)})
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior:
-        if (
-            prior.operation != "join_room"
-            or prior.request_fingerprint != request_hash
-            or prior.room_id != room.id
-        ):
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="join_room", request_hash=request_hash
+    )
+    if prior is not None:
+        if prior.room_id != room.id:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
@@ -298,12 +290,10 @@ def set_ready(
     if room.state != Room.State.READY_CHECK:
         raise GameAPIError("not_ready", "Room is not accepting readiness changes.")
     request_hash = fingerprint({"ready": ready, "room_id": str(room_id)})
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior:
-        if prior.operation != "set_ready" or prior.request_fingerprint != request_hash:
-            raise GameAPIError(
-                "idempotency_conflict", "Command ID was already used with a different request."
-            )
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="set_ready", request_hash=request_hash
+    )
+    if prior is not None:
         return room
     member.ready = ready
     member.save(update_fields=["ready"])
@@ -335,17 +325,11 @@ def start_room(
     if room is None:
         raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
     request_hash = fingerprint({"room_id": str(room_id)})
-    prior = (
-        CommandRecord.objects.select_related("match")
-        .filter(guest=guest, command_id=command_id)
-        .first()
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="start_room", request_hash=request_hash
     )
-    if prior:
-        if (
-            prior.operation != "start_room"
-            or prior.request_fingerprint != request_hash
-            or prior.match is None
-        ):
+    if prior is not None:
+        if prior.match is None:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
@@ -375,12 +359,10 @@ def leave_room(*, guest: GuestIdentity, room_id: uuid.UUID, command_id: uuid.UUI
     if room is None:
         raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
     request_hash = fingerprint({"room_id": str(room_id)})
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior:
-        if prior.operation != "leave_room" or prior.request_fingerprint != request_hash:
-            raise GameAPIError(
-                "idempotency_conflict", "Command ID was already used with a different request."
-            )
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="leave_room", request_hash=request_hash
+    )
+    if prior is not None:
         return None if room.state == Room.State.CLOSED else room
     if room.state == Room.State.ACTIVE:
         raise GameAPIError("match_not_active", "Leave the active Match instead.")

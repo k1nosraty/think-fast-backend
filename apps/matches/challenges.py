@@ -13,7 +13,7 @@ from apps.games.secrets import encrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.features import require_player_authored_challenges
 from apps.matches.models import Challenge, CommandRecord, Match, Participant, Room, RoomMembership
-from apps.matches.services import fingerprint
+from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_event
 
 
@@ -65,13 +65,14 @@ def _commit_challenge(
     if creator is None:
         raise GameAPIError("permission_denied", "You are not a participant.", status_code=403)
     request_hash = fingerprint({"match_id": str(match_id), "secret": secret})
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior:
-        if (
-            prior.operation != "commit_challenge"
-            or prior.request_fingerprint != request_hash
-            or prior.match_id != match.id
-        ):
+    prior = check_command_prior(
+        guest=guest,
+        command_id=command_id,
+        operation="commit_challenge",
+        request_hash=request_hash,
+    )
+    if prior is not None:
+        if prior.match_id != match.id:
             raise GameAPIError(
                 "idempotency_conflict", "Command ID was already used with a different request."
             )
