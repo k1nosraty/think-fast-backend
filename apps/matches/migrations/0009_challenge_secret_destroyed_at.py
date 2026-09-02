@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('matches', '0008_challenge_committed_at_challenge_creator_and_more'),
+        ("matches", "0008_challenge_committed_at_challenge_creator_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='challenge',
-            name='secret_destroyed_at',
+            model_name="challenge",
+            name="secret_destroyed_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
     ]

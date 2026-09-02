@@ -5,57 +5,102 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('matches', '0007_attempt_guess_json'),
+        ("matches", "0007_attempt_guess_json"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='challenge',
-            name='committed_at',
+            model_name="challenge",
+            name="committed_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='challenge',
-            name='creator',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='created_challenges', to='matches.participant'),
+            model_name="challenge",
+            name="creator",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="created_challenges",
+                to="matches.participant",
+            ),
         ),
         migrations.AddField(
-            model_name='challenge',
-            name='solver',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='assigned_challenges', to='matches.participant'),
+            model_name="challenge",
+            name="solver",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="assigned_challenges",
+                to="matches.participant",
+            ),
         ),
         migrations.AddField(
-            model_name='match',
-            name='setup_expires_at',
+            model_name="match",
+            name="setup_expires_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='room',
-            name='challenge_source',
-            field=models.CharField(choices=[('system', 'System'), ('players', 'Players')], default='system', max_length=20),
+            model_name="room",
+            name="challenge_source",
+            field=models.CharField(
+                choices=[("system", "System"), ("players", "Players")],
+                default="system",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='challenge',
-            name='match',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='challenges', to='matches.match'),
+            model_name="challenge",
+            name="match",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="challenges",
+                to="matches.match",
+            ),
         ),
         migrations.AlterField(
-            model_name='match',
-            name='state',
-            field=models.CharField(choices=[('setup', 'Setup'), ('countdown', 'Countdown'), ('active', 'Active'), ('finishing', 'Finishing'), ('finished', 'Finished'), ('abandoned', 'Abandoned'), ('cancelled', 'Cancelled')], default='active', max_length=20),
+            model_name="match",
+            name="state",
+            field=models.CharField(
+                choices=[
+                    ("setup", "Setup"),
+                    ("countdown", "Countdown"),
+                    ("active", "Active"),
+                    ("finishing", "Finishing"),
+                    ("finished", "Finished"),
+                    ("abandoned", "Abandoned"),
+                    ("cancelled", "Cancelled"),
+                ],
+                default="active",
+                max_length=20,
+            ),
         ),
         migrations.AddConstraint(
-            model_name='challenge',
-            constraint=models.UniqueConstraint(fields=('match', 'solver'), name='unique_match_solver_challenge'),
+            model_name="challenge",
+            constraint=models.UniqueConstraint(
+                fields=("match", "solver"), name="unique_match_solver_challenge"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='challenge',
-            constraint=models.UniqueConstraint(condition=models.Q(('solver__isnull', True)), fields=('match',), name='unique_shared_match_challenge'),
+            model_name="challenge",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("solver__isnull", True)),
+                fields=("match",),
+                name="unique_shared_match_challenge",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='challenge',
-            constraint=models.CheckConstraint(condition=models.Q(('creator__isnull', True), ('solver__isnull', True), models.Q(('creator', models.F('solver')), _negated=True), _connector='OR'), name='challenge_creator_not_solver'),
+            model_name="challenge",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    ("creator__isnull", True),
+                    ("solver__isnull", True),
+                    models.Q(("creator", models.F("solver")), _negated=True),
+                    _connector="OR",
+                ),
+                name="challenge_creator_not_solver",
+            ),
         ),
     ]
