@@ -6,7 +6,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.analytics.service import record_analytics
-from apps.matches.models import Match, Participant, Result, Room, RoomMembership
+from apps.matches.models import Match, Participant
+from apps.matches.services import finalize_friendly_abandon
 from apps.realtime.publisher import record_event
 
 
@@ -100,52 +101,5 @@ def expire_disconnect_grace(
         or participant.solve_state != Participant.SolveState.PLAYING
     ):
         return False
-    participant.solve_state = Participant.SolveState.ABANDONED
-    participant.save(update_fields=["solve_state"])
-    match.state = Match.State.ABANDONED
-    match.finished_at = now
-    match.save(update_fields=["state", "finished_at"])
-    if match.room_id:
-        room = Room.objects.select_for_update().get(pk=match.room_id)
-        room.state = Room.State.READY_CHECK
-        room.save(update_fields=["state", "updated_at"])
-        RoomMembership.objects.filter(room=room).update(ready=False)
-    other_ids = [
-        str(item)
-        for item in match.participants.exclude(pk=participant.pk).values_list("id", flat=True)
-    ]
-    Result.objects.create(
-        match=match,
-        outcome="abandoned",
-        reason="abandoned",
-        winner_participant_ids=other_ids,
-        secret_revealed=False,
-    )
-    record_event(
-        match=match,
-        event_type="match.finished",
-        visibility="match",
-        payload={
-            "outcome": "abandoned",
-            "winner_participant_ids": other_ids,
-            "reason": "abandoned",
-            "secret_revealed": False,
-        },
-    )
-    record_analytics(
-        "participant_abandoned",
-        match_id=match.id,
-        room_id=match.room_id,
-        preset_id=str(match.rules["preset_id"]),
-        reason="abandoned",
-    )
-    record_analytics(
-        "match_completed",
-        match_id=match.id,
-        room_id=match.room_id,
-        preset_id=str(match.rules["preset_id"]),
-        outcome="abandoned",
-        reason="abandoned",
-        solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
-    )
+    finalize_friendly_abandon(match, participant, now=now)
     return True

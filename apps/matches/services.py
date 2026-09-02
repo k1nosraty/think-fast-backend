@@ -205,6 +205,58 @@ def _finish_friendly(match: Match, *, reason: str, now: datetime) -> None:
     )
 
 
+def finalize_friendly_abandon(match: Match, participant: Participant, *, now: datetime) -> None:
+    participant.solve_state = Participant.SolveState.ABANDONED
+    participant.save(update_fields=["solve_state"])
+    match.state = Match.State.ABANDONED
+    match.finished_at = now
+    match.finish_due_at = None
+    match.save(update_fields=["state", "finished_at", "finish_due_at"])
+    winner_ids = [
+        str(item)
+        for item in match.participants.exclude(pk=participant.pk).values_list("id", flat=True)
+    ]
+    result = Result.objects.create(
+        match=match,
+        outcome="abandoned",
+        reason="abandoned",
+        winner_participant_ids=winner_ids,
+        secret_revealed=False,
+    )
+    if match.room_id:
+        room = Room.objects.select_for_update().get(pk=match.room_id)
+        room.state = Room.State.READY_CHECK
+        room.save(update_fields=["state", "updated_at"])
+        RoomMembership.objects.filter(room=room).update(ready=False)
+    record_event(
+        match=match,
+        event_type="match.finished",
+        visibility="match",
+        payload={
+            "outcome": result.outcome,
+            "winner_participant_ids": winner_ids,
+            "reason": result.reason,
+            "secret_revealed": False,
+        },
+    )
+    record_analytics(
+        "participant_abandoned",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        reason="abandoned",
+    )
+    record_analytics(
+        "match_completed",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        outcome="abandoned",
+        reason="abandoned",
+        solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
+    )
+
+
 def _activate_countdown(match: Match, now: datetime) -> None:
     if match.state != Match.State.COUNTDOWN or now < match.started_at:
         return
@@ -477,62 +529,38 @@ def abandon(
 
         _cancel_setup_locked(match, now=now, reason="participant_left")
     elif match.state in {Match.State.COUNTDOWN, Match.State.ACTIVE, Match.State.FINISHING}:
-        participant.solve_state = Participant.SolveState.ABANDONED
-        participant.save(update_fields=["solve_state"])
-        match.state = Match.State.ABANDONED
-        match.finished_at = now
-        match.finish_due_at = None
-        match.save(update_fields=["state", "finished_at", "finish_due_at"])
-        winner_ids = (
-            [
-                str(item)
-                for item in match.participants.exclude(pk=participant.pk).values_list(
-                    "id", flat=True
-                )
-            ]
-            if match.rules.get("match_mode") == "friendly"
-            else []
-        )
-        result = Result.objects.create(
-            match=match,
-            outcome="abandoned",
-            reason="abandoned",
-            winner_participant_ids=winner_ids,
-            secret_revealed=False,
-        )
         if match.rules.get("match_mode") == "friendly":
-            record_event(
+            finalize_friendly_abandon(match, participant, now=now)
+        else:
+            participant.solve_state = Participant.SolveState.ABANDONED
+            participant.save(update_fields=["solve_state"])
+            match.state = Match.State.ABANDONED
+            match.finished_at = now
+            match.finish_due_at = None
+            match.save(update_fields=["state", "finished_at", "finish_due_at"])
+            Result.objects.create(
                 match=match,
-                event_type="match.finished",
-                visibility="match",
-                payload={
-                    "outcome": result.outcome,
-                    "winner_participant_ids": winner_ids,
-                    "reason": result.reason,
-                    "secret_revealed": False,
-                },
+                outcome="abandoned",
+                reason="abandoned",
+                winner_participant_ids=[],
+                secret_revealed=False,
             )
-            if match.room_id:
-                room = Room.objects.select_for_update().get(pk=match.room_id)
-                room.state = Room.State.READY_CHECK
-                room.save(update_fields=["state", "updated_at"])
-                RoomMembership.objects.filter(room=room).update(ready=False)
-        record_analytics(
-            "participant_abandoned",
-            match_id=match.id,
-            room_id=match.room_id,
-            preset_id=str(match.rules["preset_id"]),
-            reason="abandoned",
-        )
-        record_analytics(
-            "match_completed",
-            match_id=match.id,
-            room_id=match.room_id,
-            preset_id=str(match.rules["preset_id"]),
-            outcome="abandoned",
-            reason="abandoned",
-            solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
-        )
+            record_analytics(
+                "participant_abandoned",
+                match_id=match.id,
+                room_id=match.room_id,
+                preset_id=str(match.rules["preset_id"]),
+                reason="abandoned",
+            )
+            record_analytics(
+                "match_completed",
+                match_id=match.id,
+                room_id=match.room_id,
+                preset_id=str(match.rules["preset_id"]),
+                outcome="abandoned",
+                reason="abandoned",
+                solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
+            )
     elif match.state not in {Match.State.ABANDONED, Match.State.CANCELLED}:
         raise GameAPIError("match_not_active", "Only an active match can be abandoned.")
     CommandRecord.objects.create(
