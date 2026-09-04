@@ -9,7 +9,6 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps import CONTRACT_VERSION
-
 from apps.matches.models import Attempt, Challenge, Match, Result
 
 

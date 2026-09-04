@@ -169,7 +169,11 @@ def test_match_resync_replays_ordered_authorized_gap_only() -> None:
 @pytest.mark.django_db(transaction=True)
 def test_publish_is_idempotent_and_missing_layer_marks_outbox_retry() -> None:
     _, _, started = active_match()
-    match_event = MatchEvent.objects.filter(match_id=started["match_id"]).order_by("sequence").first()
+    match_event = (
+        MatchEvent.objects.filter(match_id=started["match_id"])
+        .order_by("sequence")
+        .first()
+    )
     room_event = RoomEvent.objects.order_by("sequence").first()
     assert match_event is not None and room_event is not None
 

@@ -4,9 +4,9 @@ import pytest
 from django.http import HttpRequest
 from django.test import RequestFactory
 
-from config.admin import ReadOnlyProductionAdmin
 from apps.accounts.models import GuestIdentity
 from apps.matches.models import Match
+from config.admin import ReadOnlyProductionAdmin
 
 
 class _Admin(ReadOnlyProductionAdmin):
