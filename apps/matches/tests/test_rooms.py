@@ -102,9 +102,7 @@ def test_create_room_fails_closed_when_match_creation_disabled() -> None:
 @pytest.mark.django_db
 def test_create_room_retries_colliding_join_codes_then_fails() -> None:
     guest = _guest()
-    existing, _ = create_room(
-        guest=guest, command_id=_command(), preset_id="number_classic_5_v1"
-    )
+    existing, _ = create_room(guest=guest, command_id=_command(), preset_id="number_classic_5_v1")
     colliding = _guest("Keyvan")
     with patch("apps.matches.rooms._join_code", return_value=existing.join_code):
         with pytest.raises(GameAPIError) as exc_info:
@@ -400,9 +398,7 @@ def test_update_room_rules_changes_preset_resets_ready_and_state() -> None:
     set_ready(guest=opponent, room_id=room.id, command_id=_command(), ready=True)
     Room.objects.filter(pk=room.id).update(state=Room.State.READY_CHECK)
     room.refresh_from_db()
-    result = update_room_rules(
-        guest=host, room_id=room.id, preset_id="number_brain_burner_6_v1"
-    )
+    result = update_room_rules(guest=host, room_id=room.id, preset_id="number_brain_burner_6_v1")
     result.refresh_from_db()
     assert result.preset_id == "number_brain_burner_6_v1"
     assert result.state == Room.State.WAITING

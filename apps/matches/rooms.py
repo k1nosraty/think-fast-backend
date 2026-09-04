@@ -435,9 +435,7 @@ def kick_member(
 
 
 @transaction.atomic
-def update_room_rules(
-    *, guest: GuestIdentity, room_id: uuid.UUID, preset_id: str
-) -> Room:
+def update_room_rules(*, guest: GuestIdentity, room_id: uuid.UUID, preset_id: str) -> Room:
     room = Room.objects.select_for_update().filter(pk=room_id).first()
     if room is None:
         raise GameAPIError("room_not_found", "Room was not found.", status_code=404)

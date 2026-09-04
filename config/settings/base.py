@@ -95,9 +95,7 @@ CHANNEL_LAYERS = {
                     # to channels_redis's blocking-pop interval. Leave enough
                     # margin for the response when the event loop is saturated.
                     "socket_timeout": integer("REDIS_CHANNEL_SOCKET_TIMEOUT", 15),
-                    "socket_connect_timeout": integer(
-                        "REDIS_CHANNEL_CONNECT_TIMEOUT", 10
-                    ),
+                    "socket_connect_timeout": integer("REDIS_CHANNEL_CONNECT_TIMEOUT", 10),
                 }
             ]
         },

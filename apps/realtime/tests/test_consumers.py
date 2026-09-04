@@ -32,7 +32,9 @@ def test_match_consumer_rejects_when_websockets_disabled() -> None:
     async def scenario() -> None:
         _, _, started = await sync_to_async(active_match, thread_sensitive=True)()
         ws = WebsocketCommunicator(
-            application, f"/ws/v1/matches/{started['match_id']}/", headers=[(b"origin", b"http://testserver")]
+            application,
+            f"/ws/v1/matches/{started['match_id']}/",
+            headers=[(b"origin", b"http://testserver")],
         )
         connected, code = await ws.connect()
         assert connected is False
@@ -87,9 +89,7 @@ def test_match_consumer_disconnect_is_safe_without_countdown_task() -> None:
         _, _, started = await sync_to_async(active_match, thread_sensitive=True)()
         match_id = started["match_id"]
         participant = await sync_to_async(
-            lambda: Participant.objects.get(
-                match_id=match_id, guest__display_name="Amir"
-            ),
+            lambda: Participant.objects.get(match_id=match_id, guest__display_name="Amir"),
             thread_sensitive=True,
         )()
         consumer = MatchConsumer()
@@ -111,9 +111,7 @@ def test_match_consumer_disconnect_starts_grace_expiry() -> None:
         _, _, started = await sync_to_async(active_match, thread_sensitive=True)()
         match_id = started["match_id"]
         participant = await sync_to_async(
-            lambda: Participant.objects.get(
-                match_id=match_id, guest__display_name="Amir"
-            ),
+            lambda: Participant.objects.get(match_id=match_id, guest__display_name="Amir"),
             thread_sensitive=True,
         )()
         connection_id = uuid.uuid4()
@@ -186,7 +184,9 @@ def test_room_consumer_rejects_anonymous_and_nonmember() -> None:
         assert code == 4401
 
         outsider, _ = await sync_to_async(guest, thread_sensitive=True)("Sara", "avatar_03")
-        ws = WebsocketCommunicator(application, f"/ws/v1/rooms/{room_id}/", headers=_headers(outsider))
+        ws = WebsocketCommunicator(
+            application, f"/ws/v1/rooms/{room_id}/", headers=_headers(outsider)
+        )
         connected, code = await ws.connect()
         assert connected is False
         assert code == 4403

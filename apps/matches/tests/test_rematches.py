@@ -3,11 +3,10 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Match, RematchProposal, Result, Room, RoomMembership
+from apps.matches.models import Match, RematchProposal, Result
 from apps.matches.rematches import expire_rematch_proposal, rematch_command
 from apps.matches.rooms import (
     create_room,
@@ -50,9 +49,7 @@ def _finished_match() -> tuple[GuestIdentity, GuestIdentity, Match]:
 def test_rematch_rejects_solo_match() -> None:
     guest = _guest()
     with patch("apps.games.registry.generate_number_secret", return_value="12345"):
-        match, _ = create_solo(
-            guest=guest, command_id=_command(), preset_id="number_classic_5_v1"
-        )
+        match, _ = create_solo(guest=guest, command_id=_command(), preset_id="number_classic_5_v1")
     with pytest.raises(GameAPIError) as exc_info:
         rematch_command(guest=guest, match_id=match.id, command_id=_command(), action="request")
     assert exc_info.value.default_code == "invalid_request"
@@ -82,16 +79,17 @@ def test_rematch_rejects_non_latest_match() -> None:
         _, _, _ = rematch_command(
             guest=host, match_id=match.id, command_id=_command(), action="request"
         )
-        rematch_command(
-            guest=opponent, match_id=match.id, command_id=_command(), action="request"
-        )
+        rematch_command(guest=opponent, match_id=match.id, command_id=_command(), action="request")
     new_match = Match.objects.filter(room=match.room).order_by("-created_at").first()
     assert new_match is not None and new_match.id != match.id
     new_match.state = Match.State.FINISHED
     new_match.save(update_fields=["state"])
     Result.objects.create(
-        match=new_match, outcome="draw", reason="deadline",
-        winner_participant_ids=[], secret_revealed=True,
+        match=new_match,
+        outcome="draw",
+        reason="deadline",
+        winner_participant_ids=[],
+        secret_revealed=True,
     )
     with pytest.raises(GameAPIError) as exc_info:
         rematch_command(guest=host, match_id=match.id, command_id=_command(), action="request")
@@ -126,21 +124,15 @@ def test_rematch_idempotent_replay_and_conflict() -> None:
     assert created is False
     assert room1.id == room2.id
     with pytest.raises(GameAPIError) as exc_info:
-        rematch_command(
-            guest=host, match_id=match.id, command_id=command_id, action="decline"
-        )
+        rematch_command(guest=host, match_id=match.id, command_id=command_id, action="decline")
     assert exc_info.value.default_code == "idempotency_conflict"
 
 
 @pytest.mark.django_db
 def test_decline_then_new_request_creates_proposal() -> None:
     host, opponent, match = _finished_match()
-    rematch_command(
-        guest=host, match_id=match.id, command_id=_command(), action="request"
-    )
-    rematch_command(
-        guest=opponent, match_id=match.id, command_id=_command(), action="decline"
-    )
+    rematch_command(guest=host, match_id=match.id, command_id=_command(), action="request")
+    rematch_command(guest=opponent, match_id=match.id, command_id=_command(), action="decline")
     _, _, created = rematch_command(
         guest=host, match_id=match.id, command_id=_command(), action="request"
     )
@@ -156,9 +148,9 @@ def test_expire_rematch_proposal_expires_and_is_idempotent() -> None:
     host, _, match = _finished_match()
     rematch_command(guest=host, match_id=match.id, command_id=_command(), action="request")
     proposal = RematchProposal.objects.get(source_match=match)
-    assert expire_rematch_proposal(
-        proposal.id, now=proposal.expires_at + timedelta(seconds=1)
-    ) is True
+    assert (
+        expire_rematch_proposal(proposal.id, now=proposal.expires_at + timedelta(seconds=1)) is True
+    )
     proposal.refresh_from_db()
     assert proposal.state == RematchProposal.State.EXPIRED
     assert expire_rematch_proposal(proposal.id) is False

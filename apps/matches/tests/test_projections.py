@@ -30,9 +30,7 @@ def _command() -> uuid.UUID:
 def _solo() -> tuple[GuestIdentity, Match]:
     guest = _guest()
     with patch("apps.games.registry.generate_number_secret", return_value="12345"):
-        match, _ = create_solo(
-            guest=guest, command_id=_command(), preset_id="number_classic_5_v1"
-        )
+        match, _ = create_solo(guest=guest, command_id=_command(), preset_id="number_classic_5_v1")
     return guest, match
 
 

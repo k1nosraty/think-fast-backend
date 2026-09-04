@@ -35,7 +35,9 @@ def _friendly() -> tuple[GuestIdentity, GuestIdentity, Match]:
 def _solo(secret: str = "12345") -> tuple[GuestIdentity, Match]:
     guest = _guest()
     with patch("apps.games.registry.generate_number_secret", return_value=secret):
-        match, created = create_solo(guest=guest, command_id=_command(), preset_id="number_classic_5_v1")
+        match, created = create_solo(
+            guest=guest, command_id=_command(), preset_id="number_classic_5_v1"
+        )
     assert created is True
     return guest, match
 
@@ -72,7 +74,9 @@ def test_submit_guess_rejects_unknown_match() -> None:
 def test_submit_guess_rejects_non_playing_participant() -> None:
     guest, match = _solo()
     participant = match.participants.get(guest=guest)
-    Participant.objects.filter(pk=participant.pk).update(solve_state=Participant.SolveState.UNSOLVED)
+    Participant.objects.filter(pk=participant.pk).update(
+        solve_state=Participant.SolveState.UNSOLVED
+    )
     with pytest.raises(GameAPIError) as exc_info:
         submit_guess(guest=guest, match_id=match.id, command_id=_command(), guess="12345")
     assert exc_info.value.default_code == "match_not_active"
@@ -92,7 +96,7 @@ def test_submit_guess_during_expired_setup_cancels_and_rejects() -> None:
 
 @pytest.mark.django_db
 def test_submit_guess_rejects_missing_challenge() -> None:
-    host, opponent, match = _friendly()
+    host, _opponent, match = _friendly()
     Challenge.objects.filter(match=match).delete()
     with pytest.raises(GameAPIError) as exc_info:
         submit_guess(guest=host, match_id=match.id, command_id=_command(), guess="54321")
@@ -145,7 +149,7 @@ def test_friendly_attempt_limit_finishes_reason_and_resets_room() -> None:
     Participant.objects.filter(pk=opponent_participant.pk).update(
         solve_state=Participant.SolveState.UNSOLVED
     )
-    attempt, match_after, created = submit_guess(
+    attempt, _match_after, created = submit_guess(
         guest=host, match_id=match.id, command_id=_command(), guess="54321"
     )
     assert created is True
@@ -155,7 +159,10 @@ def test_friendly_attempt_limit_finishes_reason_and_resets_room() -> None:
     assert Result.objects.get(match=match).reason == "attempt_limit"
     assert match.room.state == Room.State.READY_CHECK
     assert not match.room.memberships.filter(ready=True).exists()
-    assert Participant.objects.get(pk=host_participant.pk).solve_state == Participant.SolveState.UNSOLVED
+    assert (
+        Participant.objects.get(pk=host_participant.pk).solve_state
+        == Participant.SolveState.UNSOLVED
+    )
 
 
 @pytest.mark.django_db
@@ -165,7 +172,10 @@ def test_solved_offer_within_grace_draws_but_late_solve_single_winner() -> None:
     Match.objects.filter(pk=match.id).update(deadline=base + timedelta(minutes=5))
     host_participant = match.participants.get(guest=host)
     opponent_participant = match.participants.get(guest=opponent)
-    for item, solved_at in ((host_participant, base), (opponent_participant, base + timedelta(seconds=1))):
+    for item, solved_at in (
+        (host_participant, base),
+        (opponent_participant, base + timedelta(seconds=1)),
+    ):
         Participant.objects.filter(pk=item.pk).update(
             solve_state=Participant.SolveState.SOLVED,
             attempt_count=1,
@@ -227,7 +237,7 @@ def test_abandon_rejects_unknown_match_and_nonparticipant() -> None:
         abandon(guest=guest, match_id=uuid.uuid4(), command_id=_command())
     assert exc_info.value.status_code == 404
 
-    host, _, match = _friendly()
+    _host, _, match = _friendly()
     outsider = _guest("Sara")
     with pytest.raises(GameAPIError) as exc_info:
         abandon(guest=outsider, match_id=match.id, command_id=_command())

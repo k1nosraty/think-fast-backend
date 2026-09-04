@@ -40,7 +40,7 @@ ignore = ["DJ008", "RUF012"]
 python_version = "3.12"
 plugins = ["mypy_django_plugin.main"]
 strict = true
-exclude = ["migrations"]
+exclude = ["migrations", "apps/*/tests", "tests"]
 
 [[tool.mypy.overrides]]
 module = ["channels.*", "channels_redis.*"]

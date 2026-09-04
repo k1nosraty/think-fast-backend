@@ -2,7 +2,6 @@
 
 from collections import Counter
 from collections.abc import Sequence
-
 from typing import Literal
 
 FeedbackToken = Literal["exact", "present", "absent"]

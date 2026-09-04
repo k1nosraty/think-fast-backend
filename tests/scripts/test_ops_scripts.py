@@ -58,7 +58,8 @@ def _mock_curl(
         esac
         case "$1" in
           */health/live/|*/health/ready/) ;; esac
-        """ + ("exit 22\n" if fail else printf_line)
+        """
+        + ("exit 22\n" if fail else printf_line)
     )
     (bin_dir / "curl").write_text(code)
     (bin_dir / "curl").chmod(0o755)
@@ -66,6 +67,7 @@ def _mock_curl(
 
 
 # ── Script existence & syntax ────────────────────────────────────────────────
+
 
 class TestScriptStructure:
     @pytest.mark.parametrize(
@@ -120,6 +122,7 @@ class TestBackupPostgres:
 
 # ── restore_postgres.sh ─────────────────────────────────────────────────────
 
+
 class TestRestorePostgres:
     def test_database_confirmation_mismatch(self) -> None:
         env = {
@@ -169,6 +172,7 @@ class TestRestorePostgres:
 
 
 # ── smoke_beta.sh ────────────────────────────────────────────────────────────
+
 
 class TestSmokeBeta:
     def test_success(self, tmp_path: Path) -> None:
