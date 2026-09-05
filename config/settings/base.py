@@ -67,6 +67,15 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# Django's ASGI handler opens a ThreadSensitiveContext per request, and asgiref gives
+# each such context its own single-worker executor. Every in-flight request therefore
+# runs on its own thread and, with persistent connections, pins its own thread-local
+# PostgreSQL connection. Connection count then tracks request concurrency with no upper
+# bound, which exhausted the server's max_connections under the T8 Guess load profiles.
+# A psycopg pool decouples the two: request threads wait briefly for a pooled connection
+# instead of each opening one. Pooling and persistent connections are mutually exclusive
+# in Django, so CONN_MAX_AGE must be 0 whenever the pool is enabled.
+POSTGRES_POOL_ENABLED = boolean("POSTGRES_POOL_ENABLED", True)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -75,7 +84,21 @@ DATABASES = {
         "PASSWORD": get("POSTGRES_PASSWORD", "think_fast_local"),
         "HOST": get("POSTGRES_HOST", "127.0.0.1"),
         "PORT": integer("POSTGRES_PORT", 5432),
-        "CONN_MAX_AGE": integer("POSTGRES_CONN_MAX_AGE", 60),
+        "CONN_MAX_AGE": 0 if POSTGRES_POOL_ENABLED else integer("POSTGRES_CONN_MAX_AGE", 60),
+        # Django forwards this to the pool as a pre-handout connection check, which
+        # matters because the validation suite interrupts dependencies mid-run.
+        "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": (
+            {
+                "pool": {
+                    "min_size": integer("POSTGRES_POOL_MIN", 4),
+                    "max_size": integer("POSTGRES_POOL_MAX", 32),
+                    "timeout": integer("POSTGRES_POOL_TIMEOUT", 10),
+                }
+            }
+            if POSTGRES_POOL_ENABLED
+            else {}
+        ),
     }
 }
 

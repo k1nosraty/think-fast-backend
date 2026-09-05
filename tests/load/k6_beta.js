@@ -42,12 +42,16 @@ function fixture() { return fixtures[(__VU + __ITER) % fixtures.length]; }
 function headers(row) {
   return {"Authorization": `Bearer ${row.token}`, "Content-Type": "application/json"};
 }
+function generateUUID() {
+  const hex = Array.from(new Uint8Array(crypto.randomBytes(16)), b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
 
 export function guess() {
   const row = fixture();
   const response = http.post(
     `${baseUrl}/api/v1/matches/${row.match_id}/guesses/`,
-    JSON.stringify({command_id: crypto.randomUUID(), guess: row.guess}),
+    JSON.stringify({command_id: generateUUID(), guess: row.guess}),
     {headers: headers(row)},
   );
   check(response, {"guess accepted": (item) => item.status === 201});

@@ -1,7 +1,9 @@
 import asyncio
 import uuid
+from collections.abc import Callable, Coroutine
+from typing import Any, cast
 
-from channels.db import database_sync_to_async
+from channels.db import DatabaseSyncToAsync
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.utils import timezone
@@ -12,6 +14,32 @@ from apps.matches.services import activate_countdown
 from apps.realtime.lifecycle import claim_connection, expire_disconnect_grace, release_connection
 from apps.realtime.publisher import match_group, room_group
 from config.observability import websocket_connected, websocket_disconnected
+
+
+def database_sync_to_async[T](
+    func: Callable[..., T],
+) -> Callable[..., Coroutine[Any, Any, T]]:
+    """Run a DB operation off the single thread-sensitive executor.
+
+    Channels' default ``database_sync_to_async`` is thread-sensitive: every call
+    across every consumer is serialized onto one shared executor thread, so a
+    burst of WebSocket handshakes runs its per-connection queries one at a time
+    regardless of how many pooled PostgreSQL connections are free. That serial
+    path — not the pool ceiling — is what throttled the ``sockets_2000`` gate.
+
+    Running these helpers with ``thread_sensitive=False`` lets them execute
+    concurrently on asgiref's thread pool. Each call still checks out a pooled
+    connection only for its own short transaction and returns it immediately
+    (``close_old_connections`` runs on entry and exit), so N held sockets never
+    require N checked-out connections. This is safe because every helper below
+    is self-contained: none assume a connection or transaction persists across
+    calls.
+    """
+
+    return cast(
+        "Callable[..., Coroutine[Any, Any, T]]",
+        DatabaseSyncToAsync(func, thread_sensitive=False),
+    )
 
 
 @database_sync_to_async

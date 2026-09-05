@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# T8 validation run output. Reports are cited by run ID in
+# docs/operations/README.md; the raw logs and load fixtures are retained outside
+# Git per the validation-host policy (they contain bearer tokens and are large).
+artifacts/

@@ -24,8 +24,11 @@ def _run(
     *,
     env: dict[str, str] | None = None,
     extra_path: str | None = None,
+    unset: list[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     run_env = os.environ.copy()
+    for key in unset or []:
+        run_env.pop(key, None)
     if env is not None:
         run_env.update(env)
     path = run_env.get("PATH", "")
@@ -106,7 +109,7 @@ class TestBackupPostgres:
     @pytest.mark.parametrize("var", ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_HOST", "BACKUP_DIR"])
     def test_missing_required_var_fails(self, var: str) -> None:
         env = {k: v for k, v in REQUIRED_BACKUP_ENV.items() if k != var}
-        result = _run("backup_postgres.sh", env=env)
+        result = _run("backup_postgres.sh", env=env, unset=[var])
         assert result.returncode != 0
         assert var in result.stderr
 

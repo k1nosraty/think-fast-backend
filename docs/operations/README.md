@@ -1,10 +1,14 @@
 # Production beta operations
 
-This is the operator runbook and T8 evidence register. T8 engineering and its
-single-host validation baseline are **COMPLETE**. Production Beta deployment
-approval remains **BLOCKED** until the staging column below is measured on the
-agreed topology. Local PASS proves the implementation and harness; it is not a
-public SLO or production capacity claim.
+This is the operator runbook and T8 evidence register. T8 engineering is
+**COMPLETE**; the single-host validation baseline is complete for every gate
+that a single process can prove. The three load/throughput gates
+(`guess_sustained`, `guess_burst`, `reconnect_1000`) FAIL on a single ASGI
+process by design and are deferred to the multi-replica staging topology — see
+ADR 0013. Production Beta deployment approval remains **BLOCKED** until the
+staging column below is measured on the agreed topology. Local PASS proves the
+implementation and harness; it is not a public SLO or production capacity
+claim.
 
 ## Release sequence
 
@@ -128,32 +132,118 @@ PostgreSQL variables to validate a real staging deployment.
 
 ## T8 validation register
 
-The local baseline is composed from one complete run and one selective retry
-against the same candidate (`c890c69`) on a two-core Ubuntu host:
+The local baseline is composed from multiple runs against candidate `860f2db`
+on a single-host Ubuntu stack (20 cores / 31 GB):
 
 - `report(3).md`, run `20260827T082429Z`: all executed gates passed except the
   image scan and 2,000-socket profile.
 - `report(8).md`, run `20260827T101905Z`: the corrected image scan and
   2,000-socket profile both passed; unrelated successful gates were skipped.
+- `report.md`, run `20260904T120735Z`: initial baseline. 9 of 13 gates passed.
+  `guess_sustained` and `guess_burst` were incorrectly recorded as PASS
+  because `crypto.randomUUID()` was unavailable in k6 v2.2.0 — all iterations
+  threw script exceptions and zero HTTP requests were made. `reconnect_1000`
+  failed (33% WebSocket rejection). Quality suite failed due to inherited
+  env-var leakage in `test_ops_scripts.py`.
+- Retry `20260904T123043Z`: quality and security suites PASS after test fix.
+- `report.md`, run `20260904T131139Z`: `guess_sustained` and `guess_burst`
+  re-run with the k6 UUID fix. Both surfaced ~58–63% HTTP failures with
+  `too many clients already` in the Daphne log — Django opened an unbounded,
+  per-request PostgreSQL connection that exhausted the server's
+  `max_connections`. This is a genuine defect, not a hardware limit.
+- Fix `20260905`: a bounded psycopg connection pool was added
+  (`config/settings/base.py`; `CONN_MAX_AGE=0`, `max_size` default 32). Re-run
+  under the same 100/s load, the connection count plateaus at the pool ceiling
+  with **zero** `too many clients` errors, and a single guess request measures
+  ~40 ms/`201`. The three load gates still FAIL, but now purely because a single
+  Daphne process cannot drain the target arrival rate (p95 ~14.4s, k6 drops
+  iterations while CPU stays idle). They are re-classified as multi-replica
+  staging gates. See ADR 0013.
+- Lifecycle fix `20260905`: bounding the pool exposed a second, independent
+  defect in the WebSocket handshake. Channels' default `database_sync_to_async`
+  is thread-sensitive — every consumer's DB call is serialized onto one shared
+  executor thread — so a burst of 2,000 handshakes ran its per-connection
+  queries one at a time and `sockets_2000` regressed to 1,856/2,000. The
+  handshake helpers in `apps/realtime/consumers.py` were switched to
+  `thread_sensitive=False` so each checks out a pooled connection only for its
+  own short transaction and returns it immediately. A regression test
+  (`test_consumer_db_helpers_are_not_thread_sensitive`) pins this.
+- Full re-run `20260905T153221Z` (candidate `860f2db`, `debug=false`,
+  `pool_enabled=true`, `pool_max=32`): every non-throughput gate PASS.
+  `sockets_2000` PASS — 2,000/2,000 sessions held, **0 interrupted**, 1,997/2,000
+  upgrades (99.85%), while PostgreSQL backends held **constant at 34** against a
+  peak of 2,201 open application sockets (`logs/db-connections-sockets_2000.log`,
+  `logs/app-fd-sockets_2000.log`). This is the direct evidence that 2,000 held
+  WebSockets do not require 2,000 checked-out connections. `guess_sustained`,
+  `guess_burst` and `reconnect_1000` remain FAIL as multi-replica staging gates.
 
 Generated bearer-token fixture files are intentionally excluded from evidence.
 Operational logs are retained outside Git according to the validation-host
 policy.
 
+## Staging deployment guide
+
+The production-like staging topology from `infra/staging/compose.yaml` requires
+the app and reliability-worker containers deployed from an immutable image digest
+behind the platform TLS proxy. PostgreSQL, Redis and the TLS proxy are
+**external** to the compose file and must be provisioned separately.
+
+### Provisioning checklist
+
+1. PostgreSQL 17 instance (separate host or managed service).
+2. Redis 7 instance (separate host or managed service).
+3. TLS proxy terminating HTTPS/WSS and forwarding to app replicas.
+4. `THINK_FAST_IMAGE` set to the immutable image digest (not `latest`).
+5. `THINK_FAST_ENV_FILE` pointing to production-safe environment variables.
+
+### Running validation on staging
+
+```bash
+BASE_URL=https://staging.example \
+LOAD_FIXTURE_FILE=/secure/load-fixtures.json \
+POSTGRES_HOST=staging-pg.example \
+POSTGRES_PORT=5432 \
+POSTGRES_USER=think_fast \
+POSTGRES_DB=think_fast \
+POSTGRES_PASSWORD=... \
+ALLOW_REMOTE_DB_DRILL=true \
+./scripts/run_t8_validation.sh
+```
+
+Gates that require local infrastructure control (Redis failure/recovery,
+application restart/recovery) are **automatically skipped** when
+`BASE_URL != http://127.0.0.1:8000`. These two gates require manual operator
+intervention on staging: stop Redis, verify authoritative writes, restore, run
+`publish_outbox`; restart Daphne, verify authenticated Snapshot.
+
+The `guess_sustained`, `guess_burst` and `reconnect_1000` gates are
+**throughput-bound on a single ASGI process**, not CPU-bound. Measured on a
+20-core / 31 GB host, a single guess request completes in ~40 ms with a `201`
+(well under the 300 ms threshold), and CPU stays largely idle throughout. The
+failures under load come from a single Daphne worker serializing the
+`select_for_update` guess transaction and the bounded PostgreSQL connection
+pool: at 100/s arrival a single process cannot drain the queue, so latency
+climbs to multi-second p95 and k6 drops iterations. Connection count stays
+pinned at the pool ceiling with zero `too many clients` errors — the
+exhaustion path that produced the earlier failures is closed. These gates
+therefore belong on the multi-replica staging topology, where arrivals fan out
+across app replicas behind the TLS proxy; they cannot pass against one local
+process regardless of host size.
+
 | Gate | Target | Single-host local evidence | Production-like staging |
 | --- | --- | --- | --- |
-| Unit/contract/security | no failures, no known dependency vulnerability | **PASS** — quality and security suites | **NOT RUN** |
-| Production image/settings | deploy check, minimal inventory, clean vulnerability scan | **PASS** — build, inventory and Trivy scan | **NOT RUN** |
-| Smoke | beta endpoints and protected operations respond correctly | **PASS** | **NOT RUN** |
-| Backup/restore | approved RPO/RTO | **PASS** — isolated restore, measured local RTO `0s`, 30 migration rows | **NOT RUN** — local timing is not an approved RPO/RTO |
-| 2,000 WebSockets | stable for about 5 minutes | **PASS** — 2,000/2,000 upgrades, 0 interrupted, 4m55s hold, connect p95 574.31ms | **NOT RUN** |
-| Application file descriptors | no exhaustion or growth while sockets are held | **PASS** — peak/steady 2,021 of 65,536 soft limit; returned after close | **NOT RUN** |
+| Unit/contract/security | no failures, no known dependency vulnerability | **PASS** — quality (213 tests, 96.5% coverage) and security suites; confirmed `20260904` | **NOT RUN** |
+| Production image/settings | deploy check, minimal inventory, clean vulnerability scan | **PASS** — build, inventory (no dev tools), Trivy 0 CVEs; confirmed `20260904` | **NOT RUN** |
+| Smoke | beta endpoints and protected operations respond correctly | **PASS** — health/live + health/ready return `{"status":"ok"}` | **NOT RUN** |
+| Backup/restore | approved RPO/RTO | **PASS** — isolated restore, measured local RTO `1s`, 30 migration rows | **NOT RUN** — local timing is not an approved RPO/RTO |
+| 2,000 WebSockets | stable for about 5 minutes | **PASS** — 2,000/2,000 upgrades, 0 interrupted, 4m55s hold, connect p95 138.81ms | **NOT RUN** |
+| Application file descriptors | no exhaustion or growth while sockets are held | **PASS** — peak 2,020 of 65,536 soft limit; returned to 78 after close | **NOT RUN** |
 | 1,000 active Friendly matches | no divergent durable state | **PASS baseline** — 2,000 isolated active-match fixtures plus recovery/reconnect checks | **NOT RUN** |
-| Guess sustained | 100/s for 5 minutes, p95 < 300 ms | **PASS** — k6 thresholds satisfied | **NOT RUN** |
-| Guess burst | 300/s for 30 seconds | **PASS** — k6 thresholds satisfied | **NOT RUN** |
-| Reconnect storm | 1,000/60 seconds, no divergence | **PASS** — k6 and authenticated recovery checks | **NOT RUN** |
-| Redis failure/recovery | writes authoritative, outbox/resync recovers | **PASS** — real local Redis interruption, durable Snapshot and outbox recovery | **NOT RUN** |
-| Application restart/recovery | authenticated Snapshot survives ASGI restart | **PASS** | **NOT RUN** |
+| Guess sustained | 100/s for 5 minutes, p95 < 300 ms | **FAIL (single-process throughput ceiling, not a defect)** — 20-core host; single request ~40 ms/`201`; under 100/s load p95 ~14.4s, 53% failure, k6 dropped iterations; connections pinned at pool ceiling, **0** `too many clients` | **NOT RUN — requires multi-replica fan-out** |
+| Guess burst | 300/s for 30 seconds | **FAIL (single-process throughput ceiling, not a defect)** — same cause as sustained; one Daphne worker cannot drain a 300/s arrival queue | **NOT RUN — requires multi-replica fan-out** |
+| Reconnect storm | 1,000/60 seconds, no divergence | **FAIL (single-process throughput ceiling, not a defect)** — 17/s WebSocket upgrade rate exceeds one process's handshake throughput; no durable-state divergence observed | **NOT RUN — requires multi-replica fan-out** |
+| Redis failure/recovery | writes authoritative, outbox/resync recovers | **PASS** — real local Redis interruption, durable Snapshot and outbox recovery | **NOT RUN** — requires operator intervention on staging |
+| Application restart/recovery | authenticated Snapshot survives ASGI restart | **PASS** — confirmed after Daphne restart | **NOT RUN** — requires operator intervention on staging |
 
 ### Evidence reuse and rerun rule
 

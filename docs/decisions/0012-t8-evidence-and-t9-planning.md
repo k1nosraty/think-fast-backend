@@ -1,6 +1,11 @@
 # ADR 0012 — T8 evidence composition and T9 planning boundary
 
-**Status:** Accepted on 2026-08-27
+**Status:** Accepted on 2026-08-27. The load-gate evidence below is
+**superseded by ADR 0013** (2026-09-05): the Guess-load PASS recorded here was
+an artifact of a k6 v2.2.0 UUID defect that sent zero HTTP requests. The
+corrected runs revealed a connection-exhaustion defect, now fixed by a bounded
+psycopg pool; the load gates are re-classified as multi-replica staging gates.
+This ADR's evidence-composition and T9-planning-boundary decisions still stand.
 
 ## Context
 

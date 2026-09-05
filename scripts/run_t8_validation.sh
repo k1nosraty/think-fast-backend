@@ -202,6 +202,12 @@ start_local_validation() {
   export POSTGRES_PORT=${POSTGRES_PORT:-5432}
   export REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/0}
   export DJANGO_SETTINGS_MODULE=config.settings.local
+  # Capacity measurement runs with DEBUG off so Django does not retain every SQL
+  # query on the connection, which would distort latency and memory over a long run.
+  export DJANGO_DEBUG=${DJANGO_DEBUG:-false}
+  # Bound the PostgreSQL connection pool explicitly so the exhaustion path that
+  # produced the T8 Guess-load failures ("too many clients already") cannot recur.
+  export POSTGRES_POOL_ENABLED=${POSTGRES_POOL_ENABLED:-true}
   export GAME_SECRET_ENCRYPTION_KEY=${GAME_SECRET_ENCRYPTION_KEY:-MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=}
   export LOAD_FIXTURES_ENABLED=true
   export PGPASSWORD=$POSTGRES_PASSWORD
@@ -478,12 +484,34 @@ run_load_profiles() {
       ) >"$LOG_DIR/app-fd-sockets_2000.log" 2>&1 &
       fd_sampler_pid=$!
     fi
+    # Record the live PostgreSQL backend count for the application role while the
+    # profile runs. This is the evidence that the psycopg pool bounds checkouts:
+    # holding 2,000 WebSockets must not drive 2,000 backends. Only meaningful for
+    # the runner-owned local stack, where PG* point at the compose Postgres.
+    local db_sampler_pid=""
+    if [[ "$BASE_URL" == "$LOCAL_BASE_URL" ]]; then
+      (
+        while kill -0 "$APP_PID" >/dev/null 2>&1; do
+          printf '%s backends=%s\n' "$(date -u +%FT%TZ)" \
+            "$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" \
+              -d "$POSTGRES_DB" -tAc \
+              "select count(*) from pg_stat_activity where usename='$POSTGRES_USER'" \
+              2>/dev/null | tr -d '[:space:]')"
+          sleep 1
+        done
+      ) >"$LOG_DIR/db-connections-$profile.log" 2>&1 &
+      db_sampler_pid=$!
+    fi
     run_gate "k6 $profile" "k6-$profile" env PROFILE="$profile" BASE_URL="$BASE_URL" \
       LOAD_FIXTURE_FILE="$profile_fixture" k6 run --summary-export "$ARTIFACT_DIR/k6-$profile-summary.json" \
       "$ROOT_DIR/tests/load/k6_beta.js"
     if [[ -n "$fd_sampler_pid" ]]; then
       kill "$fd_sampler_pid" >/dev/null 2>&1 || true
       wait "$fd_sampler_pid" >/dev/null 2>&1 || true
+    fi
+    if [[ -n "$db_sampler_pid" ]]; then
+      kill "$db_sampler_pid" >/dev/null 2>&1 || true
+      wait "$db_sampler_pid" >/dev/null 2>&1 || true
     fi
     if [[ "$BASE_URL" == "$LOCAL_BASE_URL" ]]; then
       if command -v shred >/dev/null 2>&1; then shred --remove "$profile_fixture"; else rm -f -- "$profile_fixture"; fi
@@ -504,6 +532,11 @@ write_report() {
     printf -- '- Host: `%s`\n\n' "$(uname -a)"
     printf -- '- Runner options: `load=%s image_scan=%s resilience=%s remote_db_drill=%s`\n\n' \
       "$RUN_LOAD_TESTS" "$RUN_IMAGE_SCAN" "$RUN_RESILIENCE_DRILLS" "$ALLOW_REMOTE_DB_DRILL"
+    if [[ "$BASE_URL" == "$LOCAL_BASE_URL" ]]; then
+      printf -- '- Capacity config: `debug=%s pool_enabled=%s pool_min=%s pool_max=%s pool_timeout=%s`\n\n' \
+        "${DJANGO_DEBUG:-unset}" "${POSTGRES_POOL_ENABLED:-unset}" \
+        "${POSTGRES_POOL_MIN:-4}" "${POSTGRES_POOL_MAX:-32}" "${POSTGRES_POOL_TIMEOUT:-10}"
+    fi
     printf -- '- Retry gates: `%s`\n\n' "${RETRY_GATES:-all}"
     printf '| Gate | Status | Evidence |\n| --- | --- | --- |\n'
     local row name status detail

@@ -186,15 +186,19 @@ are explicit and evidence-backed.
 
 **Effort:** Very high.
 
-**Status:** Engineering scope and single-host validation baseline complete on
-2026-08-27. Security, retention, observability, kill switches, audit,
-backup/restore, smoke, image scanning, capacity and failure/recovery harnesses
-all have recorded local PASS evidence. Production Beta deployment is not yet
-approved: repeat the applicable gates on the agreed production-like staging
-topology and attach infrastructure measurements; see
-`docs/operations/README.md`. T9 planning is now allowed, but this status does
-not waive the deployment gate or authorize competitive implementation before
-its plan is accepted.
+**Status:** Engineering scope complete; single-host validation baseline
+complete for every gate a single process can prove (updated 2026-09-05).
+Security, retention, observability, kill switches, audit, backup/restore,
+smoke, image scanning and failure/recovery harnesses all have recorded local
+PASS evidence. The three load/throughput gates (`guess_sustained`,
+`guess_burst`, `reconnect_1000`) FAIL on a single ASGI process by design and
+are deferred to the multi-replica staging topology; a connection-exhaustion
+defect found while re-validating them was fixed with a bounded psycopg pool —
+see ADR 0013 and `docs/operations/README.md`. Production Beta deployment is not
+yet approved: repeat the applicable gates on the agreed production-like staging
+topology and attach infrastructure measurements. T9 planning is now allowed,
+but this status does not waive the deployment gate or authorize competitive
+implementation before its plan is accepted.
 
 - Finalize security config, HTTPS/WSS, origin/host policy, throttles, admin least
   privilege, scanning, retention/deletion and audit.

@@ -7,10 +7,51 @@ from channels.testing import WebsocketCommunicator
 from django.test import override_settings
 
 from apps.matches.models import Match, Participant, Result
+from apps.realtime import consumers
 from apps.realtime.consumers import MatchConsumer, RoomConsumer
 from apps.realtime.publisher import match_group
 from config.asgi import application
 from tests.api.test_friendly_flow import active_match, command, guest
+
+
+def test_consumer_db_helpers_are_not_thread_sensitive() -> None:
+    """Every DB helper reached during a WebSocket handshake must run
+    off the shared thread-sensitive executor.
+
+    Channels' default ``database_sync_to_async`` is thread-sensitive: it
+    serializes every consumer's DB call onto one executor thread, so a burst
+    of handshakes runs its per-connection queries one at a time and each
+    in-flight request pins a PostgreSQL connection for the duration. That is
+    what throttled the ``sockets_2000`` gate and drove connection exhaustion.
+
+    Because each helper below is self-contained (its own atomic transaction or
+    single ORM query, with ``close_old_connections`` on entry and exit), the
+    pooled connection is checked out only for the short DB operation and
+    returned immediately. Holding N WebSockets therefore never requires N
+    checked-out connections. If a helper regresses to the thread-sensitive
+    default, this assertion fails before the load gate ever sees it.
+    """
+
+    helper_names = (
+        "_participant",
+        "_event",
+        "_initial_event_ids",
+        "_event_ids_after",
+        "_room_event_ids_after",
+        "_claim",
+        "_release",
+        "_expire_grace",
+        "_activate",
+        "_countdown_delay",
+        "_room_member",
+        "_room_event",
+    )
+    for name in helper_names:
+        helper = getattr(consumers, name)
+        assert helper._thread_sensitive is False, (
+            f"{name} is thread-sensitive; a burst of handshakes would serialize "
+            "on one executor thread and pin a DB connection per in-flight request"
+        )
 
 
 class _StubChannelLayer:

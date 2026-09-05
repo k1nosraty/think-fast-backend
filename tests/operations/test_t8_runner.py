@@ -37,6 +37,23 @@ def test_t8_runner_covers_every_required_capacity_profile() -> None:
     assert "LOAD_FIXTURE_START_BASE" in source
 
 
+def test_t8_runner_measures_capacity_with_debug_off_and_pool_bounded() -> None:
+    source = RUNNER.read_text()
+
+    # Capacity must be measured with DEBUG off (Django otherwise retains every SQL
+    # query on the connection) and with the psycopg pool explicitly enabled, so the
+    # connection-exhaustion path that produced the Guess-load failures cannot recur.
+    assert "export DJANGO_DEBUG=${DJANGO_DEBUG:-false}" in source
+    assert "export POSTGRES_POOL_ENABLED=${POSTGRES_POOL_ENABLED:-true}" in source
+    # The report must state the configuration each run measured.
+    assert "Capacity config:" in source
+    assert "pool_max=" in source
+    # Live backend count must be sampled during each profile: holding 2,000 sockets
+    # must not drive 2,000 PostgreSQL backends. This is the recorded pool evidence.
+    assert "db-connections-$profile.log" in source
+    assert "pg_stat_activity" in source
+
+
 def test_t8_runner_does_not_claim_local_capacity_as_production_evidence() -> None:
     source = RUNNER.read_text()
 

@@ -14,6 +14,7 @@ ADRs capture decisions that materially constrain implementation.
 - [ADR-0010: Player-authored challenges](0010-player-authored-challenges.md)
 - [ADR-0011: Production beta controls and evidence gate](0011-production-beta-controls.md)
 - [ADR-0012: T8 evidence composition and T9 planning boundary](0012-t8-evidence-and-t9-planning.md)
+- [ADR-0013: T8 connection pool fix and load-gate topology](0013-t8-connection-pool-and-load-gate-topology.md)
 
 Use the next sequential number. State context, decision, consequences, and
 status. Supersede old decisions; do not silently rewrite their history.
