@@ -25,7 +25,11 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
     match.refresh_from_db()
     rules = rules_from_snapshot(match.rules)
     history = rules.history_policy
-    attempt_rows = list(participant.attempts.all())
+    is_party = match.room is not None and getattr(match.room, "room_mode", "party") == "party"
+    if is_party:
+        attempt_rows = list(participant.attempts.filter(round_number=match.round_number))
+    else:
+        attempt_rows = list(participant.attempts.all())
     if history.get("type") == "last_n":
         count = history.get("count", 1)
         attempt_rows = attempt_rows[-(count if isinstance(count, int) else 1) :]
@@ -55,7 +59,8 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         }
         if match.result.secret_revealed:
             challenge = (
-                Challenge.objects.filter(match=match, solver=participant).first()
+                Challenge.objects.filter(match=match, round_number=match.round_number, solver__isnull=True).first()
+                or Challenge.objects.filter(match=match, solver=participant).first()
                 or Challenge.objects.filter(match=match, solver__isnull=True).first()
             )
             if challenge is not None and challenge.secret_destroyed_at is None:
@@ -64,20 +69,60 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 )
             else:
                 result["secret_revealed"] = False
-    actions = ["submit_guess", "leave"] if match.state == Match.State.ACTIVE else []
+    actions = []
+    if match.state == Match.State.ACTIVE:
+        if not is_party or not participant.is_creator:
+            actions.append("submit_guess")
+        actions.append("leave")
+    elif match.state == Match.State.SETUP:
+        if is_party:
+            if participant.is_creator:
+                actions.extend(["commit_challenge", "leave"])
+            else:
+                actions.append("leave")
+        else:
+            own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
+            actions = ["leave"] if own_commit else ["commit_challenge", "leave"]
+    elif match.round_state == "round_finished":
+        if is_party and match.round_number < match.total_rounds:
+            actions.append("next_round")
+        if match.room_id:
+            actions.append("request_rematch")
+        actions.append("leave")
+    elif match.state in {Match.State.FINISHED, Match.State.ABANDONED}:
+        if match.room_id:
+            actions.append("request_rematch")
+
     setup = None
     if match.state == Match.State.SETUP:
-        own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
-        committed_count = Challenge.objects.filter(match=match, committed_at__isnull=False).count()
-        setup = {
-            "expires_at": iso(match.setup_expires_at),
-            "own_challenge_committed": own_commit,
-            "committed_count": committed_count,
-            "required_count": 2,
-        }
-        actions = ["leave"] if own_commit else ["commit_challenge", "leave"]
-    if match.room_id and match.state in {Match.State.FINISHED, Match.State.ABANDONED}:
-        actions.append("request_rematch")
+        if is_party:
+            own_commit = Challenge.objects.filter(
+                match=match, round_number=match.round_number, creator=participant
+            ).exists()
+            committed_count = (
+                1
+                if Challenge.objects.filter(
+                    match=match, round_number=match.round_number, committed_at__isnull=False
+                ).exists()
+                else 0
+            )
+            setup = {
+                "expires_at": iso(match.setup_expires_at),
+                "own_challenge_committed": own_commit,
+                "committed_count": committed_count,
+                "required_count": 1,
+                "is_creator": participant.is_creator,
+                "creator_participant_id": str(match.creator_id) if match.creator_id else None,
+            }
+        else:
+            own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
+            committed_count = Challenge.objects.filter(match=match, committed_at__isnull=False).count()
+            setup = {
+                "expires_at": iso(match.setup_expires_at),
+                "own_challenge_committed": own_commit,
+                "committed_count": committed_count,
+                "required_count": 2,
+            }
     participants = list(match.participants.all())
     role = "host" if match.room is not None and match.room.host_id == guest.id else "player"
     return {
@@ -85,6 +130,11 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         "match_id": str(match.id),
         "room_id": str(match.room_id) if match.room_id else None,
         "state": match.state,
+        "round_state": match.round_state,
+        "round_number": match.round_number,
+        "total_rounds": match.total_rounds,
+        "creator_participant_id": str(match.creator_id) if match.creator_id else None,
+        "scores": {str(item.id): item.score for item in participants},
         "rules": match.rules,
         "server_time": iso(timezone.now()),
         "started_at": iso(match.started_at),
@@ -104,6 +154,8 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 else ("connected" if item.connected else "disconnected"),
                 "attempt_count": item.attempt_count,
                 "solve_state": item.solve_state,
+                "score": item.score,
+                "is_creator": item.is_creator,
             }
             for item in participants
         ],

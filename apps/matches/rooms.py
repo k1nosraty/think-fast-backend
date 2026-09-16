@@ -53,6 +53,8 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         "viewer_participant_id": str(viewer_membership.id) if viewer_membership else None,
         "preset_id": room.preset_id,
         "challenge_source": room.challenge_source,
+        "room_mode": room.room_mode,
+        "rounds_count": room.rounds_count,
         "state": room.state,
         "latest_sequence": room.latest_sequence,
         "latest_match_id": str(latest_match.id) if latest_match else None,
@@ -95,11 +97,15 @@ def _create_friendly_match(
     countdown_seconds = settings.FRIENDLY_COUNTDOWN_SECONDS
     player_authored = room.challenge_source == Room.ChallengeSource.PLAYERS
     started_at = now + timedelta(seconds=countdown_seconds)
+    is_party = room.room_mode == "party"
     match = Match.objects.create(
         room=room,
         state=Match.State.SETUP
         if player_authored
         else (Match.State.ACTIVE if countdown_seconds == 0 else Match.State.COUNTDOWN),
+        round_state="creator_setup" if player_authored else ("active" if countdown_seconds == 0 else "countdown"),
+        round_number=1,
+        total_rounds=room.rounds_count if is_party else 1,
         rules=rules.snapshot(),
         started_at=started_at,
         deadline=started_at + timedelta(seconds=rules.match_deadline_seconds),
@@ -107,23 +113,65 @@ def _create_friendly_match(
         if player_authored
         else None,
     )
+    participants: list[Participant] = []
     for member in members:
-        Participant.objects.create(
+        p = Participant.objects.create(
             match=match,
             guest=member.guest,
             display_name=member.display_name,
             avatar_id=member.avatar_id,
             connected=member.connected,
         )
-    if not player_authored:
+        participants.append(p)
+    if player_authored and is_party:
+        host_p = next((p for p in participants if p.guest_id == room.host_id), participants[0])
+        host_p.is_creator = True
+        host_p.save(update_fields=["is_creator"])
+        match.creator = host_p
+        match.save(update_fields=["creator"])
+    elif not player_authored:
         adapter = adapter_for(rules.game_type)
         secret = secret_factory(rules) if secret_factory else adapter.generate_secret(rules)
         Challenge.objects.create(
-            match=match, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
+            match=match, round_number=1, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
         )
     room.state = Room.State.ACTIVE
     room.save(update_fields=["state", "updated_at"])
-    if player_authored:
+    if player_authored and is_party:
+        assert match.setup_expires_at is not None
+        record_event(
+            match=match,
+            event_type="creator.selected",
+            visibility="match",
+            payload={
+                "creator_participant_id": str(host_p.id),
+                "creator_display_name": host_p.display_name,
+                "round_number": 1,
+            },
+        )
+        record_event(
+            match=match,
+            event_type="round.created",
+            visibility="match",
+            payload={
+                "round_number": 1,
+                "total_rounds": match.total_rounds,
+                "creator_participant_id": str(host_p.id),
+                "creator_display_name": host_p.display_name,
+                "expires_at": match.setup_expires_at.isoformat().replace("+00:00", "Z"),
+            },
+        )
+        record_event(
+            match=match,
+            event_type="challenge.setup_started",
+            visibility="match",
+            payload={
+                "expires_at": match.setup_expires_at.isoformat().replace("+00:00", "Z"),
+                "creator_participant_id": str(host_p.id),
+                "required_count": 1,
+            },
+        )
+    elif player_authored:
         assert match.setup_expires_at is not None
         record_event(
             match=match,
@@ -171,12 +219,14 @@ def create_room(
     command_id: uuid.UUID,
     preset_id: str,
     challenge_source: str = Room.ChallengeSource.SYSTEM,
+    room_mode: str = "duel",
+    rounds_count: int = 5,
 ) -> tuple[Room, bool]:
     require_match_creation()
     if challenge_source == Room.ChallengeSource.PLAYERS:
         require_player_authored_challenges()
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
-    request_hash = fingerprint({"preset_id": preset_id, "challenge_source": challenge_source})
+    request_hash = fingerprint({"preset_id": preset_id, "challenge_source": challenge_source, "room_mode": room_mode, "rounds_count": rounds_count})
     prior = check_command_prior(
         guest=guest, command_id=command_id, operation="create_room", request_hash=request_hash
     )
@@ -199,6 +249,8 @@ def create_room(
         host=guest,
         preset_id=preset_id,
         challenge_source=challenge_source,
+        room_mode=room_mode,
+        rounds_count=rounds_count,
     )
     RoomMembership.objects.create(
         room=room,
@@ -246,8 +298,9 @@ def join_room(
         return room, False
     if room.state not in {Room.State.WAITING, Room.State.READY_CHECK}:
         raise GameAPIError("room_full", "Room is no longer joinable.")
-    if room.memberships.count() >= 2:
-        raise GameAPIError("room_full", "Room already has two players.")
+    max_players = 2 if room.room_mode == "duel" else 8
+    if room.memberships.count() >= max_players:
+        raise GameAPIError("room_full", f"Room has reached its maximum capacity of {max_players} players.")
     RoomMembership.objects.filter(room=room).update(ready=False)
     joined_member = RoomMembership.objects.create(
         room=room,
@@ -337,8 +390,10 @@ def start_room(
     if room.host_id != guest.id:
         raise GameAPIError("not_room_host", "Only the room host can start.", status_code=403)
     members = list(room.memberships.select_for_update())
-    if len(members) != 2 or not all(member.ready for member in members):
-        raise GameAPIError("not_ready", "Exactly two ready players are required.")
+    if len(members) < 2 or not all(member.ready for member in members):
+        raise GameAPIError("not_ready", "At least two ready players are required.")
+    if room.room_mode == "duel" and len(members) != 2:
+        raise GameAPIError("not_ready", "Exactly two ready players are required for Duel mode.")
     if room.state != Room.State.READY_CHECK:
         raise GameAPIError("not_ready", "Room cannot start in its current state.")
     match = _create_friendly_match(room=room, members=members, secret_factory=secret_factory)
@@ -391,7 +446,8 @@ def leave_room(*, guest: GuestIdentity, room_id: uuid.UUID, command_id: uuid.UUI
         room.host = remaining.guest
     remaining.ready = False
     remaining.save(update_fields=["ready"])
-    room.state = Room.State.WAITING
+    remaining_count = RoomMembership.objects.filter(room=room).count()
+    room.state = Room.State.READY_CHECK if remaining_count >= 2 else Room.State.WAITING
     room.save(update_fields=["host", "state", "updated_at"])
     return room
 
@@ -409,7 +465,7 @@ def kick_member(
         raise GameAPIError("room_not_found", "Room was not found.", status_code=404)
     if room.host_id != guest.id:
         raise GameAPIError("not_room_host", "Only the room host can kick.", status_code=403)
-    if room.state != Room.State.READY_CHECK:
+    if room.state not in {Room.State.WAITING, Room.State.READY_CHECK}:
         raise GameAPIError("not_ready", "Room cannot be changed in its current state.")
     target = RoomMembership.objects.filter(room=room, id=target_participant_id).first()
     if target is None:

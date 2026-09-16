@@ -18,6 +18,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T7 | Challenge expansion | **Complete** — safe player-authored duel; Word remains gated after bounded spike |
 | T8 | Production beta | **Engineering complete** — hardening and local exit baseline pass; production-like staging approval remains pending |
 | T9 | Competitive product | **Ready for planning** — split Ranked/matchmaking/progression into bounded tasks before implementation |
+| T10 | Party Mode Core Gameplay Redesign | **Complete** — 1 Creator → Multiple Guessers (2–8 players), 60s round timer, placement scoring, fair rotation, rematch |
 
 ## Release boundaries
 

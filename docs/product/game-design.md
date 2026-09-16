@@ -240,6 +240,35 @@ both solve simultaneously after countdown
   difficulty differs.
 - The Domain models separate Challenges; it must not assume one `Match.secret`.
 
+## Party Mode (1 Creator → Multiple Guessers)
+
+Party Mode simplifies multiplayer group play for 2–8 players into a fast, social, high-energy party loop:
+
+```text
+             CREATOR (Rotates each round)
+                │
+                ▼
+           SECRET CODE (Authoritative server challenge)
+                │
+       ┌────────┼────────┐
+       ▼        ▼        ▼
+    PLAYER A  PLAYER B  PLAYER C ... (Up to 8 players)
+       │        │        │
+     Guess    Guess    Guess
+   (Private) (Private)(Private)
+```
+
+- **Core Topology:** One player is chosen as the Creator each round; all other players independently solve against the shared challenge.
+- **Creator Secret Input:** The Creator manually builds the secret within a quick setup window.
+- **Simultaneous Guessing:** All guessers submit guesses concurrently and receive immediate private positional feedback.
+- **Zero Leak Guarantee:** Guessers never see other players' guesses or feedback; the server broadcasts only public solve notifications (`party.player_solved`).
+- **Short Authoritative Timer:** Default 60-second round countdown enforced strictly by the backend.
+- **Party Scoring System:**
+  - *Guessers:* Points rewarded based on solve speed and placement: 1st solver (+100), 2nd solver (+75), 3rd solver (+50), remaining solvers (+25).
+  - *Creator:* Points rewarded based on secret difficulty: +80 bonus if completely unsolved by all guessers, plus +20 points per unsolved guesser.
+- **Creator Rotation & Multi-Round Matches:** Matches run for 3, 5, or 7 rounds. The Creator role rotates fairly in round-robin order after each round. Disconnected players are gracefully bypassed.
+- **End-of-Round Social Reveal & Rematch:** At round end, the secret is revealed, round points and cumulative leaderboards are displayed, and after the final round a podium (🥇, 🥈, 🥉) with 1-click Rematch is presented.
+
 ## Word gate
 
 Word is strategically interesting but not approved for MVP implementation.

@@ -23,6 +23,8 @@ class Room(models.Model):
     challenge_source = models.CharField(
         max_length=20, choices=ChallengeSource, default=ChallengeSource.SYSTEM
     )
+    room_mode = models.CharField(max_length=20, default="party")
+    rounds_count = models.PositiveIntegerField(default=5)
     state = models.CharField(max_length=20, choices=State, default=State.WAITING)
     latest_sequence = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -61,6 +63,16 @@ class Match(models.Model):
         Room, on_delete=models.PROTECT, related_name="matches", null=True, blank=True
     )
     state = models.CharField(max_length=20, choices=State, default=State.ACTIVE)
+    round_state = models.CharField(max_length=30, default="active")
+    round_number = models.PositiveIntegerField(default=1)
+    total_rounds = models.PositiveIntegerField(default=5)
+    creator = models.ForeignKey(
+        "Participant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_matches",
+    )
     rules = models.JSONField()
     started_at = models.DateTimeField()
     deadline = models.DateTimeField()
@@ -85,6 +97,10 @@ class Participant(models.Model):
     )
     display_name = models.CharField(max_length=20)
     avatar_id = models.CharField(max_length=50)
+    score = models.PositiveIntegerField(default=0)
+    round_score = models.PositiveIntegerField(default=0)
+    round_rank = models.PositiveIntegerField(null=True, blank=True)
+    is_creator = models.BooleanField(default=False)
     attempt_count = models.PositiveIntegerField(default=0)
     solve_state = models.CharField(max_length=20, choices=SolveState, default=SolveState.PLAYING)
     solved_at = models.DateTimeField(null=True, blank=True)
@@ -103,6 +119,7 @@ class Participant(models.Model):
 class Challenge(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="challenges")
+    round_number = models.PositiveIntegerField(default=1)
     creator = models.ForeignKey(
         Participant,
         on_delete=models.PROTECT,
@@ -127,7 +144,7 @@ class Challenge(models.Model):
                 fields=["match", "solver"], name="unique_match_solver_challenge"
             ),
             models.UniqueConstraint(
-                fields=["match"],
+                fields=["match", "round_number"],
                 condition=models.Q(solver__isnull=True),
                 name="unique_shared_match_challenge",
             ),
@@ -143,6 +160,7 @@ class Challenge(models.Model):
 class Attempt(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     participant = models.ForeignKey(Participant, on_delete=models.CASCADE, related_name="attempts")
+    round_number = models.PositiveIntegerField(default=1)
     command_id = models.UUIDField()
     request_fingerprint = models.CharField(max_length=64)
     ordinal = models.PositiveIntegerField()

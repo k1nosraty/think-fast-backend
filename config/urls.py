@@ -9,6 +9,7 @@ from apps.matches.views import (
     ChallengeCommitView,
     GuessCreateView,
     LeaveView,
+    NextRoundView,
     RematchView,
     RoomByCodeView,
     RoomCreateView,
@@ -50,6 +51,11 @@ urlpatterns = [
     ),
     path("api/v1/matches/<uuid:match_id>/snapshot/", SnapshotView.as_view(), name="match-snapshot"),
     path("api/v1/matches/<uuid:match_id>/leave/", LeaveView.as_view(), name="match-leave"),
+    path(
+        "api/v1/matches/<uuid:match_id>/next-round/",
+        NextRoundView.as_view(),
+        name="match-next-round",
+    ),
     path(
         "api/v1/matches/<uuid:match_id>/rematch/",
         RematchView.as_view(),

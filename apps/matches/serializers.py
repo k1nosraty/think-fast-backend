@@ -10,6 +10,8 @@ class CreateSoloSerializer(serializers.Serializer[dict[str, object]]):
 
 class CreateRoomSerializer(CreateSoloSerializer):
     challenge_source = serializers.ChoiceField(choices=["system", "players"], default="system")
+    room_mode = serializers.ChoiceField(choices=["party", "duel"], default="duel")
+    rounds_count = serializers.IntegerField(min_value=1, max_value=15, default=5)
 
 
 class GuessSerializer(serializers.Serializer[dict[str, object]]):

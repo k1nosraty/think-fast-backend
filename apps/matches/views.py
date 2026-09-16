@@ -9,7 +9,8 @@ from apps.accounts.models import GuestIdentity
 from apps.analytics.throttles import AnalyticsScopedRateThrottle, ResilientScopedRateThrottle
 from apps.matches.challenges import commit_challenge
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Room, RoomMembership
+from apps.matches.models import Match, Room, RoomMembership
+from apps.matches.party import advance_party_round, commit_party_secret, submit_party_guess
 from apps.matches.projections import snapshot
 from apps.matches.rematches import rematch_command
 from apps.matches.rooms import (
@@ -65,9 +66,15 @@ class GuessCreateView(APIView):
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
         serializer = GuessSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        attempt, match, created = submit_guess(
-            guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
-        )
+        match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
+        if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
+            attempt, match, created = submit_party_guess(
+                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+            )
+        else:
+            attempt, match, created = submit_guess(
+                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+            )
         return Response(
             {
                 "command_id": str(attempt.command_id),
@@ -128,13 +135,28 @@ class ChallengeCommitView(APIView):
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
         serializer = CommitChallengeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        match, created = commit_challenge(
-            guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
-        )
+        match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
+        if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
+            match, created = commit_party_secret(
+                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+            )
+        else:
+            match, created = commit_challenge(
+                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+            )
         return Response(
             snapshot(match, authenticated_guest(request)),
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class NextRoundView(APIView):
+    throttle_classes = [ResilientScopedRateThrottle]
+    throttle_scope = "room_command"
+
+    def post(self, request: Request, match_id: uuid.UUID) -> Response:
+        match = advance_party_round(guest=authenticated_guest(request), match_id=match_id)
+        return Response(snapshot(match, authenticated_guest(request)))
 
 
 class RoomCreateView(APIView):
