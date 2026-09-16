@@ -8,16 +8,16 @@ COMMANDS = [
     ["ruff", "format", "--check", "."],
     ["ruff", "check", "."],
     ["mypy", "apps", "config"],
-    ["python", "manage.py", "check", "--settings=config.settings.test"],
+    [sys.executable, "manage.py", "check", "--settings=config.settings.test"],
     [
-        "python",
+        sys.executable,
         "manage.py",
         "makemigrations",
         "--check",
         "--dry-run",
         "--settings=config.settings.test",
     ],
-    ["python", "scripts/validate_contracts.py"],
+    [sys.executable, "scripts/validate_contracts.py"],
     ["pytest"],
 ]
 
