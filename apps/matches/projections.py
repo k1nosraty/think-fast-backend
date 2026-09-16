@@ -59,7 +59,9 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         }
         if match.result.secret_revealed:
             challenge = (
-                Challenge.objects.filter(match=match, round_number=match.round_number, solver__isnull=True).first()
+                Challenge.objects.filter(
+                    match=match, round_number=match.round_number, solver__isnull=True
+                ).first()
                 or Challenge.objects.filter(match=match, solver=participant).first()
                 or Challenge.objects.filter(match=match, solver__isnull=True).first()
             )
@@ -116,7 +118,9 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             }
         else:
             own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
-            committed_count = Challenge.objects.filter(match=match, committed_at__isnull=False).count()
+            committed_count = Challenge.objects.filter(
+                match=match, committed_at__isnull=False
+            ).count()
             setup = {
                 "expires_at": iso(match.setup_expires_at),
                 "own_challenge_committed": own_commit,

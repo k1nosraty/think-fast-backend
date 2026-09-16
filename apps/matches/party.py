@@ -9,12 +9,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
-from apps.analytics.service import record_analytics
-from apps.games.color import ColorValidationError
-from apps.games.domain import GuessValidationError
+from apps.games.base import GameValidationError
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret, encrypt_secret
 from apps.matches.errors import GameAPIError
+from apps.matches.idempotency import check_command_prior, fingerprint
 from apps.matches.models import (
     Attempt,
     Challenge,
@@ -25,7 +24,6 @@ from apps.matches.models import (
     Room,
     RoomMembership,
 )
-from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_event
 
 GUESSER_POINTS = [100, 75, 50, 25]
@@ -42,15 +40,16 @@ def get_current_round_challenge(match: Match) -> Challenge | None:
     ).first()
 
 
-def pick_next_creator(match: Match, exclude_participant: Participant | None = None) -> Participant | None:
+def pick_next_creator(
+    match: Match, exclude_participant: Participant | None = None
+) -> Participant | None:
     if match.room:
         member_guest_ids = list(
             match.room.memberships.order_by("joined_at").values_list("guest_id", flat=True)
         )
         all_participants = list(match.participants.all())
         participants = [
-            p for gid in member_guest_ids
-            for p in all_participants if p.guest_id == gid
+            p for gid in member_guest_ids for p in all_participants if p.guest_id == gid
         ]
     else:
         participants = list(match.participants.all())
@@ -91,12 +90,18 @@ def commit_party_secret(
 
     creator = Participant.objects.select_for_update().filter(match=match, guest=guest).first()
     if creator is None:
-        raise GameAPIError("permission_denied", "You are not a participant in this match.", status_code=403)
+        raise GameAPIError(
+            "permission_denied", "You are not a participant in this match.", status_code=403
+        )
 
     if match.creator_id != creator.id and not creator.is_creator:
-        raise GameAPIError("not_creator", "Only the current round creator can submit the secret.", status_code=403)
+        raise GameAPIError(
+            "not_creator", "Only the current round creator can submit the secret.", status_code=403
+        )
 
-    request_hash = fingerprint({"match_id": str(match_id), "round": match.round_number, "secret": secret})
+    request_hash = fingerprint(
+        {"match_id": str(match_id), "round": match.round_number, "secret": secret}
+    )
     prior = check_command_prior(
         guest=guest,
         command_id=command_id,
@@ -113,14 +118,16 @@ def commit_party_secret(
     adapter = adapter_for(rules.game_type)
     try:
         encoded = adapter.encode_secret(rules, secret)
-    except (GuessValidationError, ColorValidationError) as exc:
+    except GameValidationError as exc:
         raise GameAPIError(exc.code, "Secret violates the active rules.", status_code=400) from exc
 
     existing = Challenge.objects.filter(
         match=match, round_number=match.round_number, solver__isnull=True
     ).first()
     if existing:
-        raise GameAPIError("challenge_already_committed", "A secret for this round is already committed.")
+        raise GameAPIError(
+            "challenge_already_committed", "A secret for this round is already committed."
+        )
 
     Challenge.objects.create(
         match=match,
@@ -186,9 +193,12 @@ def calculate_and_apply_scores(match: Match, reason: str, now: datetime) -> dict
         )
     )
     creator = match.creator
-    unsolved_count = match.participants.filter(
+    unsolved_qs = match.participants.filter(
         solve_state__in=[Participant.SolveState.PLAYING, Participant.SolveState.UNSOLVED]
-    ).exclude(pk=creator.pk if creator else None).count()
+    )
+    if creator is not None:
+        unsolved_qs = unsolved_qs.exclude(pk=creator.pk)
+    unsolved_count = unsolved_qs.count()
 
     solver_records: list[dict[str, Any]] = []
     for idx, solver in enumerate(solvers):
@@ -322,10 +332,14 @@ def submit_party_guess(
 
     participant = Participant.objects.select_for_update().filter(match=match, guest=guest).first()
     if participant is None:
-        raise GameAPIError("permission_denied", "You are not a participant in this match.", status_code=403)
+        raise GameAPIError(
+            "permission_denied", "You are not a participant in this match.", status_code=403
+        )
 
     if participant.is_creator or (match.creator_id == participant.id):
-        raise GameAPIError("creator_cannot_guess", "The creator cannot guess in their own round.", status_code=403)
+        raise GameAPIError(
+            "creator_cannot_guess", "The creator cannot guess in their own round.", status_code=403
+        )
 
     request_hash = fingerprint({"guess": guess, "round": match.round_number})
     prior = Attempt.objects.filter(
@@ -370,7 +384,7 @@ def submit_party_guess(
 
     try:
         canonical_guess, feedback, solved = adapter.evaluate(rules, secret, guess)
-    except (GuessValidationError, ColorValidationError) as exc:
+    except GameValidationError as exc:
         raise GameAPIError(exc.code, "Guess violates the active rules.", status_code=400) from exc
 
     participant.attempt_count += 1
@@ -426,7 +440,9 @@ def submit_party_guess(
                 "participant_id": str(participant.id),
                 "display_name": participant.display_name,
                 "attempt_count": attempt.ordinal,
-                "solve_duration_ms": max(0, int((current - match.started_at).total_seconds() * 1000)),
+                "solve_duration_ms": max(
+                    0, int((current - match.started_at).total_seconds() * 1000)
+                ),
                 "round_number": match.round_number,
             },
         )
@@ -449,7 +465,9 @@ def advance_party_round(
 
     caller = Participant.objects.select_for_update().filter(match=match, guest=guest).first()
     if caller is None:
-        raise GameAPIError("permission_denied", "You are not a participant in this match.", status_code=403)
+        raise GameAPIError(
+            "permission_denied", "You are not a participant in this match.", status_code=403
+        )
 
     if match.round_state != "round_finished":
         raise GameAPIError("not_ready", "Current round has not finished.")
@@ -484,16 +502,27 @@ def advance_party_round(
     match.state = Match.State.SETUP
     match.round_state = "creator_setup"
     match.setup_expires_at = current + timedelta(seconds=DEFAULT_SETUP_DURATION_SECONDS)
-    match.save(update_fields=["round_number", "creator", "state", "round_state", "setup_expires_at"])
+    match.save(
+        update_fields=["round_number", "creator", "state", "round_state", "setup_expires_at"]
+    )
 
     for p in match.participants.all():
-        p.is_creator = (p.id == next_creator.id)
+        p.is_creator = p.id == next_creator.id
         p.solve_state = Participant.SolveState.PLAYING
         p.attempt_count = 0
         p.round_score = 0
         p.round_rank = None
         p.solved_at = None
-        p.save(update_fields=["is_creator", "solve_state", "attempt_count", "round_score", "round_rank", "solved_at"])
+        p.save(
+            update_fields=[
+                "is_creator",
+                "solve_state",
+                "attempt_count",
+                "round_score",
+                "round_rank",
+                "solved_at",
+            ]
+        )
 
     record_event(
         match=match,

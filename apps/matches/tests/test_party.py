@@ -1,11 +1,12 @@
 import uuid
 from datetime import timedelta
+
 from django.test import TestCase
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Match, Participant, Room, RoomMembership
+from apps.matches.models import Match, Participant, Room
 from apps.matches.party import (
     advance_party_round,
     commit_party_secret,
@@ -18,18 +19,10 @@ from apps.matches.rooms import create_room, join_room, set_ready, start_room
 
 class PartyModeTests(TestCase):
     def setUp(self) -> None:
-        self.host, _ = GuestIdentity.issue(
-            display_name="HostPlayer", avatar_id="avatar1"
-        )
-        self.p2, _ = GuestIdentity.issue(
-            display_name="PlayerTwo", avatar_id="avatar2"
-        )
-        self.p3, _ = GuestIdentity.issue(
-            display_name="PlayerThree", avatar_id="avatar3"
-        )
-        self.p4, _ = GuestIdentity.issue(
-            display_name="PlayerFour", avatar_id="avatar4"
-        )
+        self.host, _ = GuestIdentity.issue(display_name="HostPlayer", avatar_id="avatar1")
+        self.p2, _ = GuestIdentity.issue(display_name="PlayerTwo", avatar_id="avatar2")
+        self.p3, _ = GuestIdentity.issue(display_name="PlayerThree", avatar_id="avatar3")
+        self.p4, _ = GuestIdentity.issue(display_name="PlayerFour", avatar_id="avatar4")
 
     def test_party_room_supports_up_to_8_players(self) -> None:
         room, _ = create_room(
@@ -44,16 +37,12 @@ class PartyModeTests(TestCase):
         self.assertEqual(room.rounds_count, 5)
 
         for i in range(2, 9):
-            guest, _ = GuestIdentity.issue(
-                display_name=f"Player{i}", avatar_id=f"avatar{i}"
-            )
+            guest, _ = GuestIdentity.issue(display_name=f"Player{i}", avatar_id=f"avatar{i}")
             join_room(guest=guest, room_id=room.id, command_id=uuid.uuid4())
 
         self.assertEqual(room.memberships.count(), 8)
 
-        p9, _ = GuestIdentity.issue(
-            display_name="Player9", avatar_id="avatar9"
-        )
+        p9, _ = GuestIdentity.issue(display_name="Player9", avatar_id="avatar9")
         with self.assertRaises(GameAPIError) as ctx:
             join_room(guest=p9, room_id=room.id, command_id=uuid.uuid4())
         self.assertEqual(ctx.exception.default_code, "room_full")
@@ -106,7 +95,12 @@ class PartyModeTests(TestCase):
         )
         match.refresh_from_db()
         from django.conf import settings
-        expected_state = Match.State.COUNTDOWN if getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 3) > 0 else Match.State.ACTIVE
+
+        expected_state = (
+            Match.State.COUNTDOWN
+            if getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 3) > 0
+            else Match.State.ACTIVE
+        )
         self.assertEqual(match.state, expected_state)
 
         active_time = now + timedelta(seconds=4)
@@ -127,7 +121,9 @@ class PartyModeTests(TestCase):
             guess="78345",
             now=active_time,
         )
-        self.assertEqual(attempt_p3.feedback["positions"], ["exact", "absent", "absent", "exact", "absent"])
+        self.assertEqual(
+            attempt_p3.feedback["positions"], ["exact", "absent", "absent", "exact", "absent"]
+        )
         self.assertFalse(attempt_p3.solved)
 
         attempt_p2, match, _ = submit_party_guess(
@@ -229,6 +225,7 @@ class PartyModeTests(TestCase):
         self.assertIsNone(p2_snap.get("result"))
 
         import json
+
         snap_json = json.dumps(p2_snap)
         self.assertNotIn("98765", snap_json)
 
@@ -269,6 +266,7 @@ class PartyModeTests(TestCase):
 
     def test_http_party_endpoints(self) -> None:
         from rest_framework.test import APIClient
+
         client_host = APIClient()
         client_host.force_authenticate(user=self.host)
         client_p2 = APIClient()
@@ -295,10 +293,20 @@ class PartyModeTests(TestCase):
         )
         self.assertEqual(join_resp.status_code, 200)
 
-        client_host.post(f"/api/v1/rooms/{room_id}/ready/", {"command_id": str(uuid.uuid4()), "ready": True}, format="json")
-        client_p2.post(f"/api/v1/rooms/{room_id}/ready/", {"command_id": str(uuid.uuid4()), "ready": True}, format="json")
+        client_host.post(
+            f"/api/v1/rooms/{room_id}/ready/",
+            {"command_id": str(uuid.uuid4()), "ready": True},
+            format="json",
+        )
+        client_p2.post(
+            f"/api/v1/rooms/{room_id}/ready/",
+            {"command_id": str(uuid.uuid4()), "ready": True},
+            format="json",
+        )
 
-        start_resp = client_host.post(f"/api/v1/rooms/{room_id}/start/", {"command_id": str(uuid.uuid4())}, format="json")
+        start_resp = client_host.post(
+            f"/api/v1/rooms/{room_id}/start/", {"command_id": str(uuid.uuid4())}, format="json"
+        )
         self.assertEqual(start_resp.status_code, 201)
         match_id = start_resp.data["match_id"]
 

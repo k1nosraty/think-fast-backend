@@ -7,10 +7,9 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import GuestIdentity
 from apps.analytics.throttles import AnalyticsScopedRateThrottle, ResilientScopedRateThrottle
-from apps.matches.challenges import commit_challenge
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Match, Room, RoomMembership
-from apps.matches.party import advance_party_round, commit_party_secret, submit_party_guess
+from apps.matches.models import Room, RoomMembership
+from apps.matches.party import advance_party_round
 from apps.matches.projections import snapshot
 from apps.matches.rematches import rematch_command
 from apps.matches.rooms import (
@@ -35,7 +34,13 @@ from apps.matches.serializers import (
     RematchSerializer,
     UpdateRoomRulesSerializer,
 )
-from apps.matches.services import abandon, create_solo, refresh_match_state, submit_guess
+from apps.matches.services import (
+    abandon,
+    commit_any_challenge,
+    create_solo,
+    refresh_match_state,
+    submit_any_guess,
+)
 
 
 def authenticated_guest(request: Request) -> GuestIdentity:
@@ -66,15 +71,9 @@ class GuessCreateView(APIView):
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
         serializer = GuessSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
-        if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
-            attempt, match, created = submit_party_guess(
-                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
-            )
-        else:
-            attempt, match, created = submit_guess(
-                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
-            )
+        attempt, match, created = submit_any_guess(
+            guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+        )
         return Response(
             {
                 "command_id": str(attempt.command_id),
@@ -111,6 +110,9 @@ class LeaveView(APIView):
         return Response(snapshot(match, authenticated_guest(request)))
 
 
+AbandonView = LeaveView
+
+
 class RematchView(APIView):
     throttle_classes = [ResilientScopedRateThrottle]
     throttle_scope = "rematch"
@@ -135,19 +137,16 @@ class ChallengeCommitView(APIView):
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
         serializer = CommitChallengeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
-        if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
-            match, created = commit_party_secret(
-                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
-            )
-        else:
-            match, created = commit_challenge(
-                guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
-            )
+        match, created = commit_any_challenge(
+            guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+        )
         return Response(
             snapshot(match, authenticated_guest(request)),
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+CommitChallengeView = ChallengeCommitView
 
 
 class NextRoundView(APIView):

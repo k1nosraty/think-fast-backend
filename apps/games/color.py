@@ -1,9 +1,11 @@
+import json
 import secrets
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import asdict, dataclass
-from typing import Literal
+from dataclasses import asdict, dataclass, fields
+from typing import Literal, cast
 
+from apps.games.base import GameValidationError
 from apps.games.feedback import positional_feedback
 
 
@@ -90,10 +92,8 @@ COLOR_PRESETS = {
 }
 
 
-class ColorValidationError(ValueError):
-    def __init__(self, code: str) -> None:
-        self.code = code
-        super().__init__(code)
+class ColorValidationError(GameValidationError):
+    """Validation error specific to color sequence guesses."""
 
 
 def color_ids(rules: ColorRules) -> tuple[str, ...]:
@@ -154,3 +154,37 @@ def generate_color_secret(
         if Counter(result)[symbol] < rules.max_symbol_repetition:
             result.append(symbol)
     return validate_color_sequence(result, rules)
+
+
+class ColorAdapter:
+    def rules_from_snapshot(self, snapshot: dict[str, object]) -> ColorRules:
+        values = dict(snapshot)
+        values["palette"] = tuple(
+            ColorDefinition(**item) for item in cast(list[dict[str, str]], snapshot["palette"])
+        )
+        return ColorRules(**{field.name: values[field.name] for field in fields(ColorRules)})  # type: ignore[arg-type]
+
+    def generate_secret(self, rules: object) -> list[str]:
+        import apps.games.registry as reg
+
+        generator = getattr(reg, "generate_color_secret", generate_color_secret)
+        return cast(list[str], generator(cast(ColorRules, rules)))
+
+    def encode_secret(self, rules: object, secret: object) -> str:
+        canonical = validate_color_sequence(secret, cast(ColorRules, rules))
+        return json.dumps(canonical, separators=(",", ":"))
+
+    def decode_secret(self, rules: object, value: str) -> list[str]:
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ColorValidationError("invalid_symbol") from exc
+        return validate_color_sequence(parsed, cast(ColorRules, rules))
+
+    def evaluate(
+        self, rules: object, secret: object, guess: object
+    ) -> tuple[object, dict[str, object], bool]:
+        color_rules = cast(ColorRules, rules)
+        canonical = validate_color_sequence(guess, color_rules)
+        feedback, solved = evaluate_color(rules=color_rules, secret=secret, guess=canonical)
+        return canonical, feedback, solved

@@ -1,5 +1,3 @@
-import hashlib
-import json
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -9,12 +7,13 @@ from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
 from apps.analytics.service import record_analytics
-from apps.games.color import ColorValidationError
-from apps.games.domain import PRESETS, GuessValidationError
+from apps.games.base import GameValidationError
+from apps.games.domain import PRESETS
 from apps.games.registry import Rules, adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret, encrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.features import require_match_creation
+from apps.matches.idempotency import check_command_prior, fingerprint
 from apps.matches.models import (
     Attempt,
     Challenge,
@@ -27,28 +26,18 @@ from apps.matches.models import (
 )
 from apps.realtime.publisher import record_event
 
-
-def fingerprint(payload: dict[str, object]) -> str:
-    return hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-
-
-def check_command_prior(
-    *,
-    guest: GuestIdentity,
-    command_id: uuid.UUID,
-    operation: str,
-    request_hash: str,
-) -> CommandRecord | None:
-    prior = CommandRecord.objects.filter(guest=guest, command_id=command_id).first()
-    if prior is not None and (
-        prior.operation != operation or prior.request_fingerprint != request_hash
-    ):
-        raise GameAPIError(
-            "idempotency_conflict", "Command ID was already used with a different request."
-        )
-    return prior
+__all__ = [
+    "abandon",
+    "activate_countdown",
+    "check_command_prior",
+    "commit_any_challenge",
+    "create_solo",
+    "finalize_friendly_abandon",
+    "fingerprint",
+    "refresh_match_state",
+    "submit_any_guess",
+    "submit_guess",
+]
 
 
 @transaction.atomic
@@ -342,7 +331,7 @@ def _submit_guess(
     secret = adapter.decode_secret(rules, serialized_secret)
     try:
         canonical_guess, feedback, solved = adapter.evaluate(rules, secret, guess)
-    except (GuessValidationError, ColorValidationError) as exc:
+    except GameValidationError as exc:
         raise GameAPIError(exc.code, "Guess violates the active rules.", status_code=400) from exc
     participant.attempt_count += 1
     participant.solve_state = (
@@ -571,3 +560,45 @@ def abandon(
         match=match,
     )
     return match
+
+
+def submit_any_guess(
+    *,
+    guest: GuestIdentity,
+    match_id: uuid.UUID,
+    command_id: uuid.UUID,
+    guess: object,
+    now: datetime | None = None,
+) -> tuple[Attempt, Match, bool]:
+    """Unified guess submission dispatching to party or solo/duel mode."""
+    match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
+    if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
+        from apps.matches.party import submit_party_guess
+
+        return submit_party_guess(
+            guest=guest, match_id=match_id, command_id=command_id, guess=guess, now=now
+        )
+    return submit_guess(guest=guest, match_id=match_id, command_id=command_id, guess=guess, now=now)
+
+
+def commit_any_challenge(
+    *,
+    guest: GuestIdentity,
+    match_id: uuid.UUID,
+    command_id: uuid.UUID,
+    secret: object,
+    now: datetime | None = None,
+) -> tuple[Match, bool]:
+    """Unified challenge commit dispatching to party or player-authored challenge."""
+    match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
+    if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
+        from apps.matches.party import commit_party_secret
+
+        return commit_party_secret(
+            guest=guest, match_id=match_id, command_id=command_id, secret=secret, now=now
+        )
+    from apps.matches.challenges import commit_challenge
+
+    return commit_challenge(
+        guest=guest, match_id=match_id, command_id=command_id, secret=secret, now=now
+    )

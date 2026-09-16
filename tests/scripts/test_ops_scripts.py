@@ -16,6 +16,10 @@ from textwrap import dedent
 
 import pytest
 
+pytestmark = pytest.mark.skipif(
+    os.name == "nt", reason="POSIX bash shell required for script tests"
+)
+
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 
 

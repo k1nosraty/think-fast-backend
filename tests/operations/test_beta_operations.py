@@ -1,4 +1,5 @@
 import json
+import os
 import stat
 import uuid
 from datetime import timedelta
@@ -135,7 +136,8 @@ def test_load_fixture_generation_is_explicit_and_private(tmp_path: Path) -> None
     rows = json.loads(output.read_text(encoding="utf-8"))
     assert len(rows) == 1
     assert set(rows[0]) == {"match_id", "token", "guess"}
-    assert stat.S_IMODE(output.stat().st_mode) == 0o600
+    if os.name != "nt":
+        assert stat.S_IMODE(output.stat().st_mode) == 0o600
     assert Match.objects.filter(state=Match.State.ACTIVE).count() == 1
 
     second_output = tmp_path / "load-second.json"

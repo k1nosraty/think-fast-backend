@@ -6,6 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from apps.games.base import GameValidationError
 from apps.games.feedback import positional_feedback
 
 WordFeedbackToken = Literal["exact", "present", "absent"]
@@ -14,10 +15,8 @@ _ARABIC_TO_PERSIAN = str.maketrans({"ي": "ی", "ى": "ی", "ك": "ک"})
 _IGNORABLE_SPACING = {" ", "\t", "\n", "\r", "\u200c", "\u200d", "\ufeff"}
 
 
-class WordSpikeError(ValueError):
-    def __init__(self, code: str) -> None:
-        self.code = code
-        super().__init__(code)
+class WordSpikeError(GameValidationError):
+    """Validation error specific to Persian word guesses."""
 
 
 def normalize_persian_word(value: object) -> str:

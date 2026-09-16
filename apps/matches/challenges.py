@@ -6,14 +6,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
-from apps.games.color import ColorValidationError
-from apps.games.domain import GuessValidationError
+from apps.games.base import GameValidationError
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import encrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.features import require_player_authored_challenges
+from apps.matches.idempotency import check_command_prior, fingerprint
 from apps.matches.models import Challenge, CommandRecord, Match, Participant, Room, RoomMembership
-from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_event
 
 
@@ -95,7 +94,7 @@ def _commit_challenge(
     adapter = adapter_for(rules.game_type)
     try:
         encoded = adapter.encode_secret(rules, secret)
-    except (GuessValidationError, ColorValidationError) as exc:
+    except GameValidationError as exc:
         raise GameAPIError(exc.code, "Secret violates the active rules.", status_code=400) from exc
     Challenge.objects.create(
         match=match,

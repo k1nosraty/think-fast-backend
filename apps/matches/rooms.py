@@ -103,7 +103,9 @@ def _create_friendly_match(
         state=Match.State.SETUP
         if player_authored
         else (Match.State.ACTIVE if countdown_seconds == 0 else Match.State.COUNTDOWN),
-        round_state="creator_setup" if player_authored else ("active" if countdown_seconds == 0 else "countdown"),
+        round_state="creator_setup"
+        if player_authored
+        else ("active" if countdown_seconds == 0 else "countdown"),
         round_number=1,
         total_rounds=room.rounds_count if is_party else 1,
         rules=rules.snapshot(),
@@ -133,7 +135,9 @@ def _create_friendly_match(
         adapter = adapter_for(rules.game_type)
         secret = secret_factory(rules) if secret_factory else adapter.generate_secret(rules)
         Challenge.objects.create(
-            match=match, round_number=1, protected_secret=encrypt_secret(adapter.encode_secret(rules, secret))
+            match=match,
+            round_number=1,
+            protected_secret=encrypt_secret(adapter.encode_secret(rules, secret)),
         )
     room.state = Room.State.ACTIVE
     room.save(update_fields=["state", "updated_at"])
@@ -226,7 +230,14 @@ def create_room(
     if challenge_source == Room.ChallengeSource.PLAYERS:
         require_player_authored_challenges()
     GuestIdentity.objects.select_for_update().get(pk=guest.pk)
-    request_hash = fingerprint({"preset_id": preset_id, "challenge_source": challenge_source, "room_mode": room_mode, "rounds_count": rounds_count})
+    request_hash = fingerprint(
+        {
+            "preset_id": preset_id,
+            "challenge_source": challenge_source,
+            "room_mode": room_mode,
+            "rounds_count": rounds_count,
+        }
+    )
     prior = check_command_prior(
         guest=guest, command_id=command_id, operation="create_room", request_hash=request_hash
     )
@@ -300,7 +311,9 @@ def join_room(
         raise GameAPIError("room_full", "Room is no longer joinable.")
     max_players = 2 if room.room_mode == "duel" else 8
     if room.memberships.count() >= max_players:
-        raise GameAPIError("room_full", f"Room has reached its maximum capacity of {max_players} players.")
+        raise GameAPIError(
+            "room_full", f"Room has reached its maximum capacity of {max_players} players."
+        )
     RoomMembership.objects.filter(room=room).update(ready=False)
     joined_member = RoomMembership.objects.create(
         room=room,

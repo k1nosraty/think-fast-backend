@@ -1,65 +1,32 @@
-from collections import Counter
-from dataclasses import asdict, dataclass, replace
+"""Domain rules facade aggregating presets across all game modes."""
+
+from dataclasses import replace
 from typing import Literal
 
-from apps.games.feedback import FeedbackToken, positional_feedback
+from apps.games.color import COLOR_PRESETS, ColorRules
+from apps.games.number import (
+    NUMBER_PRESETS,
+    GuessValidationError,
+    NumberRules,
+    evaluate_number,
+    validate_sequence,
+)
+from apps.games.word_spike import WORD_PRESETS, WordRules
 
-
-@dataclass(frozen=True)
-class NumberRules:
-    preset_id: str
-    game_type: Literal["number"]
-    match_mode: Literal["practice", "friendly"]
-    schema_version: int
-    evaluator_version: int
-    sequence_length: int
-    allow_leading_zero: bool
-    allow_duplicates: bool
-    max_symbol_repetition: int
-    feedback_policy: Literal["positional"]
-    history_policy: dict[str, str]
-    match_deadline_seconds: int
-    attempt_limit: int
-
-    def snapshot(self) -> dict[str, object]:
-        return asdict(self)
-
-
-NUMBER_PRESETS = {
-    "number_classic_5_v1": NumberRules(
-        "number_classic_5_v1",
-        "number",
-        "practice",
-        1,
-        1,
-        5,
-        False,
-        True,
-        2,
-        "positional",
-        {"type": "full"},
-        180,
-        12,
-    ),
-    "number_brain_burner_6_v1": NumberRules(
-        "number_brain_burner_6_v1",
-        "number",
-        "practice",
-        1,
-        1,
-        6,
-        False,
-        True,
-        2,
-        "positional",
-        {"type": "full"},
-        240,
-        15,
-    ),
-}
-
-from apps.games.color import COLOR_PRESETS, ColorRules  # noqa: E402
-from apps.games.word_spike import WORD_PRESETS, WordRules  # noqa: E402
+# Re-export for backward compatibility
+__all__ = [
+    "COLOR_PRESETS",
+    "NUMBER_PRESETS",
+    "PRESETS",
+    "WORD_PRESETS",
+    "ColorRules",
+    "GuessValidationError",
+    "NumberRules",
+    "WordRules",
+    "evaluate_number",
+    "rules_for_mode",
+    "validate_sequence",
+]
 
 PRESETS: dict[str, NumberRules | ColorRules | WordRules] = {
     **NUMBER_PRESETS,
@@ -75,32 +42,3 @@ def rules_for_mode(
     if rules is None:
         return None
     return replace(rules, match_mode=mode)
-
-
-class GuessValidationError(ValueError):
-    def __init__(self, code: str) -> None:
-        self.code = code
-        super().__init__(code)
-
-
-def validate_sequence(value: str, rules: NumberRules) -> str:
-    if len(value) != rules.sequence_length:
-        raise GuessValidationError("invalid_guess_length")
-    if not value.isascii() or not value.isdigit():
-        raise GuessValidationError("invalid_symbol")
-    if not rules.allow_leading_zero and value.startswith("0"):
-        raise GuessValidationError("leading_zero_not_allowed")
-    counts = Counter(value)
-    if not rules.allow_duplicates and max(counts.values()) > 1:
-        raise GuessValidationError("duplicate_not_allowed")
-    if max(counts.values()) > rules.max_symbol_repetition:
-        raise GuessValidationError("repetition_limit_exceeded")
-    return value
-
-
-def evaluate_number(
-    *, rules: NumberRules, secret: str, guess: str
-) -> tuple[list[FeedbackToken], bool]:
-    validate_sequence(secret, rules)
-    validate_sequence(guess, rules)
-    return positional_feedback(secret, guess)
