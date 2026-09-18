@@ -8,17 +8,10 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 
 | Task | Milestone | Playable outcome |
 | --- | --- | --- |
-| T0 | Decision and contract freeze | **Complete** — MVP rules and v1 draft contract frozen |
-| T1 | Engineering foundation | **Complete** — reproducible local/CI backend foundation |
-| T2 | Solo Number vertical slice | **Complete** — guest completes a Number match end-to-end |
-| T3 | Private room and realtime 1v1 | **Complete** — two guests play a shared-secret match |
-| T4 | Reliability and recovery | **Complete** — retry, deadlines, resync, restart, and reconnect are safe |
-| T5 | Rematch and gameplay polish | **Complete** — play-rematch loop and safe playtest analytics |
-| T6 | Color expansion | **Complete** — Color Classic and Permutation use the shared match platform |
-| T7 | Challenge expansion | **Complete** — safe player-authored duel; Word remains gated after bounded spike |
-| T8 | Production beta | **Engineering complete** — hardening and local exit baseline pass; production-like staging approval remains pending |
+| T0–T7 | Foundation through Challenge | **Implemented · Unit-tested** — see the bounded task records and their evidence |
+| T8 | Production beta | **Implemented · Unit-tested** — single-host baseline passes; staging and production approval remain pending |
 | T9 | Competitive product | **Ready for planning** — split Ranked/matchmaking/progression into bounded tasks before implementation |
-| T10 | Party Mode Core Gameplay Redesign | **Complete** — 1 Creator → Multiple Guessers (2–8 players), 60s round timer, placement scoring, fair rotation, rematch |
+| T10 | Party Mode Core Gameplay Redesign | **Implemented · Unit-tested · E2E-verified** — 1 Creator → Multiple Guessers (2–8), 60s timer, placement scoring, rotation and rematch |
 
 ## Release boundaries
 
@@ -68,3 +61,7 @@ A task closes only when:
 - migrations and operational impact are documented;
 - the vertical outcome is demonstrated on the supported client path;
 - unresolved limitations are recorded rather than hidden.
+
+The cross-repository status source is the workspace [`TASKS.md`](../TASKS.md).
+After TF-05, the next task is TF-06 (cross-repository CI); no Backend roadmap
+entry is `Staging-verified` or `Production-approved` yet.

@@ -19,10 +19,13 @@ other files link to it instead of copying it.
 
 ## Reading paths
 
-Backend: architecture → domain model → contract → backend guide → assigned task.
+For humans, start with product rules, architecture/domain model and the API
+contract, then open the role-specific guide needed for the work.
 
-AI: root `AGENTS.md` → relevant nested `AGENTS.md` → mandatory path above →
-assigned task only.
+For AI agents, root `AGENTS.md` is the only canonical reading order. A nearer
+`AGENTS.md` must be read before changing files in its scope; task-specific
+documents are read only when that task requires them. This page is a map, not a
+second competing instruction sequence.
 
 ## Documentation rule
 

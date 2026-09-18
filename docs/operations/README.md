@@ -1,5 +1,10 @@
 # Production beta operations
 
+This document is for staging/production operators. For ordinary local startup,
+port conflicts and a two-user browser smoke test, use the
+[workspace README](../../../README.md) and `../../../run-think-fast.sh`; do not
+copy production credentials or release procedures into local development.
+
 This is the operator runbook and T8 evidence register. T8 engineering is
 **COMPLETE**; the single-host validation baseline is complete for every gate
 that a single process can prove. The three load/throughput gates
@@ -9,6 +14,12 @@ ADR 0013. Production Beta deployment approval remains **BLOCKED** until the
 staging column below is measured on the agreed topology. Local PASS proves the
 implementation and harness; it is not a public SLO or production capacity
 claim.
+
+Status terminology is intentionally strict: `Implemented`/`Unit-tested` describe
+the application and automated checks; a local **PASS** in this register is not
+`Staging-verified`; `Production-approved` requires every required staging cell
+to be measured and an explicit release decision. At present the staging column
+is still `NOT RUN`, so Production Beta remains blocked.
 
 ## Release sequence
 

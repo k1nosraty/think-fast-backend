@@ -2,6 +2,9 @@
 
 This is the canonical Django work plan. Give an AI agent exactly one task with
 the current repository. The separate React repository has its own task plan.
+The cross-repository status source is the workspace [`TASKS.md`](../../../TASKS.md);
+the historical “next task” sentences below describe sequencing at the time and
+must not override its current active task (TF-06 after TF-05).
 
 ## Prompt prefix for every task
 
@@ -220,3 +223,24 @@ After the T8 engineering baseline, design Ranked fixed RuleSets, matchmaking, ra
 leaderboard/seasons, anti-farming/multi-account/disconnect abuse, report/block,
 progression separation and capacity. Split the accepted plan into new bounded
 vertical tasks. Do not ask one AI agent to implement all competitive features.
+
+## T10 — Party Mode Core Gameplay Redesign
+
+**Status:** `Implemented · Unit-tested · E2E-verified` (2026-09-18)
+
+**Bounded outcome:** Party Mode supports a 1 Creator → Multiple Guessers room
+with 2–8 participants, authoritative 60-second rounds, placement scoring,
+creator rotation, rematch and recovery-safe command handling. This task does
+not change the two-player Friendly rules and does not authorize Ranked work.
+
+**Acceptance evidence:**
+
+- Party/realtime tests: `uv run pytest apps/matches/tests/test_party.py tests/realtime/ --no-cov -q` — 16 passed.
+- Backend quality/security: `uv run python scripts/check.py` — 226 passed;
+  `uv run python scripts/check_security.py` — passed.
+- Contract validators pass at revision `v1.0.0-draft.1-r2` with 20 fixtures.
+- Live browser capacity flow: `npx playwright test e2e/party.spec.ts` — 1
+  passed, covering the 2-player creator setup and 8-player room capacity.
+
+`Staging-verified` and `Production-approved` remain unset; see the operations
+evidence register and the workspace tracker for those separate release gates.

@@ -53,7 +53,12 @@ def rematch_command(
     command_id: uuid.UUID,
     action: str,
 ) -> tuple[Room, Match | None, bool]:
-    match = Match.objects.select_for_update().select_related("room").filter(pk=match_id).first()
+    match = (
+        Match.objects.select_for_update(of=("self",))
+        .select_related("room")
+        .filter(pk=match_id)
+        .first()
+    )
     if match is None:
         raise GameAPIError("match_not_found", "Match was not found.", status_code=404)
     if match.room is None:

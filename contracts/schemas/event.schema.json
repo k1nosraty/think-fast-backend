@@ -40,7 +40,8 @@
             "required": ["participant_id", "attempt_count"],
             "properties": {
               "participant_id": {"type": "string", "format": "uuid"},
-              "attempt_count": {"type": "integer", "minimum": 1}
+              "attempt_count": {"type": "integer", "minimum": 1},
+              "round_number": {"type": "integer", "minimum": 1}
             }
           }
         }
@@ -60,7 +61,61 @@
               "attempt_id": {"type": "string", "format": "uuid"},
               "ordinal": {"type": "integer", "minimum": 1},
               "feedback": {"$ref": "feedback.schema.json"},
-              "solved": {"type": "boolean"}
+              "solved": {"type": "boolean"},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "round.finished"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["round_number", "total_rounds", "reason", "solvers", "creator", "revealed_secret", "scores"],
+            "properties": {
+              "round_number": {"type": "integer", "minimum": 1},
+              "total_rounds": {"type": "integer", "minimum": 1},
+              "reason": {"enum": ["all_solved", "deadline"]},
+              "solvers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["participant_id", "display_name", "attempt_count", "solve_duration_ms"],
+                  "properties": {
+                    "participant_id": {"type": "string", "format": "uuid"},
+                    "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+                    "attempt_count": {"type": "integer", "minimum": 1},
+                    "solve_duration_ms": {"type": "integer", "minimum": 0}
+                  }
+                }
+              },
+              "creator": {
+                "oneOf": [
+                  {"type": "null"},
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["participant_id", "display_name"],
+                    "properties": {
+                      "participant_id": {"type": "string", "format": "uuid"},
+                      "display_name": {"type": "string", "minLength": 1, "maxLength": 20}
+                    }
+                  }
+                ]
+              },
+              "revealed_secret": {
+                "oneOf": [
+                  {"type": "string", "pattern": "^[0-9]{5,6}$"},
+                  {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+                ]
+              },
+              "scores": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
             }
           }
         }

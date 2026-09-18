@@ -3,7 +3,9 @@
 This document explains protocol principles, resources, events, errors, and
 recovery. T0 is complete: the canonical machine-readable source is
 `contracts/openapi.json`, its JSON Schemas, manifest, and fixtures at
-`v1.0.0-draft.1`.
+`v1.0.0-draft.1`. The current compatible bundle revision is
+`v1.0.0-draft.1-r2`; `contracts/manifest.json` records that revision, every
+canonical fixture, and the deterministic SHA-256 of all other JSON artifacts.
 
 ## Global rules
 
@@ -26,18 +28,52 @@ POST /api/v1/guest-sessions/
 GET  /api/v1/game-definitions/
 POST /api/v1/solo-matches/
 POST /api/v1/rooms/
+GET  /api/v1/rooms/by-code/{join_code}/
+GET  /api/v1/rooms/{room_id}/
 POST /api/v1/rooms/{room_id}/join/
+POST /api/v1/rooms/{room_id}/kick/
+POST /api/v1/rooms/{room_id}/leave/
 POST /api/v1/rooms/{room_id}/ready/
+POST /api/v1/rooms/{room_id}/rules/
 POST /api/v1/rooms/{room_id}/start/
 POST /api/v1/matches/{match_id}/challenges/
 POST /api/v1/matches/{match_id}/guesses/
 POST /api/v1/matches/{match_id}/leave/
+POST /api/v1/matches/{match_id}/next-round/
 POST /api/v1/matches/{match_id}/rematch/
 GET  /api/v1/matches/{match_id}/snapshot/
 ```
 
-Compatible detail may be added during implementation. A rename, removal, or
-semantic change requires explicit contract versioning and coordinated review.
+The Account verification/session endpoints previously present only in the
+Frontend copy are not part of this revision because no Backend route implements
+them. Adding them requires a separate approved contract and implementation.
+
+Compatible additions increment the bundle revision (`-rN`) while keeping the
+contract version. A rename, removal, newly required field, narrowed accepted
+value, or semantic change requires a new incompatible contract version and
+coordinated client/server review. Every revision regenerates the manifest
+checksum and is copied from Backend to consumers; generated copies are never
+edited by hand.
+
+## Party contract
+
+`POST /rooms/` accepts `room_mode: party` and `rounds_count` from 1 through 15;
+omitting them preserves the `duel` and 5-round defaults. Party rooms allow up
+to eight members. Room snapshots expose both fields.
+
+A Party match snapshot uses the common Snapshot schema plus `round_number`,
+`total_rounds`, `creator_participant_id`, per-participant `score` and
+`is_creator`, the `scores` map, and `round_state`. Only the current creator may
+commit the round challenge; non-creators may submit guesses. After
+`round.finished`, `next_round` appears in `available_actions` while another
+ round remains. `POST /matches/{match_id}/next-round/` accepts the common
+ `command_id` body, advances to the next round or returns the terminal match
+ snapshot, and is retry-safe for the same participant and command identity.
+
+Party events use the common ordered envelope. The canonical
+`party-round-finished.json` fixture freezes the public round summary, revealed
+round secret and score map; participant-private `guess.evaluated` and public
+`opponent.guessed` may additionally carry `round_number`.
 
 ## Command outcome
 

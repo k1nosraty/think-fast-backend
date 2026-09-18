@@ -3,6 +3,17 @@
 `check.py` is the single non-interactive quality entrypoint used locally and in
 CI. `validate_contracts.py` remains the dependency-free T0 contract validator.
 
+Common entrypoints:
+
+| Command | Purpose |
+| --- | --- |
+| `uv run python scripts/check.py` | format, lint, types, Django, migrations, contracts, tests and coverage |
+| `uv run python scripts/check_security.py` | security-sensitive static/runtime checks |
+| `uv run python scripts/validate_contracts.py` | canonical contract integrity |
+| `scripts/smoke_beta.sh` | smoke a running beta API |
+| `scripts/backup_postgres.sh` | checksummed PostgreSQL backup |
+| `scripts/restore_postgres.sh` | explicitly confirmed isolated restore |
+
 Prefer Django management commands for operations that need application context.
 Scripts must be non-interactive in CI and safe to run repeatedly where possible.
 

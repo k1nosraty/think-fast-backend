@@ -47,7 +47,9 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         for item in attempt_rows
     ]
     result = None
-    if hasattr(match, "result"):
+    if hasattr(match, "result") and (
+        not is_party or match.round_state in {"round_finished", "match_finished"}
+    ):
         outcome = match.result.outcome
         if outcome == "won" and str(participant.id) not in match.result.winner_participant_ids:
             outcome = "lost"

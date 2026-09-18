@@ -1,11 +1,11 @@
 # 0014. Party Mode Core Gameplay Redesign
 
 Date: 2026-09-16
-Status: Accepted
+Status: Accepted; implementation and live E2E evidence recorded 2026-09-18
 
 ## Context
 
-The previous friendly room architecture attempted to generalize 2-player player-authored duel concepts (symmetric pairwise secret generation) or single-match duels across larger groups. For 3–8 players sitting together in a party environment, an $N \times N$ secret exchange created unacceptable configuration complexity, slow match startup, and confusing player-to-player relationships.
+The previous friendly room architecture attempted to generalize 2-player player-authored duel concepts (symmetric pairwise secret generation) or single-match duels across larger groups. For 3–8 players sitting together in a party environment, an $N \times N$ secret exchange created unacceptable configuration complexity, slow match startup, and confusing player-to-player relationships. This ADR supersedes that two-player-only assumption for Party Mode; Friendly 1v1 remains unchanged, while Party's supported range is **2–8** (a two-player Party is a valid minimum-capacity case).
 
 ## Decision
 

@@ -14,3 +14,15 @@ Current T0 contract suite:
 python scripts/validate_contracts.py
 python -m unittest discover -s tests/contracts -p "test_*.py" -v
 ```
+
+The repository-wide baseline is `uv run python scripts/check.py`. For focused
+work, run the smallest owning suite first, for example:
+
+```bash
+uv run pytest tests/contracts/
+uv run pytest tests/realtime/ apps/realtime/tests/
+uv run pytest tests/api/
+```
+
+Tests requiring real PostgreSQL or Redis must say so explicitly and document
+their setup. A timeout, skipped dependency or unrun command is not a pass.

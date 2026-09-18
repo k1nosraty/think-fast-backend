@@ -118,8 +118,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Solo match created",
+          "200": {
+            "description": "Existing Solo match returned for the same command ID",
             "content": {
               "application/json": {
                 "schema": {
@@ -128,8 +128,8 @@
               }
             }
           },
-          "200": {
-            "description": "Existing Solo match returned for the same command ID",
+          "201": {
+            "description": "Solo match created",
             "content": {
               "application/json": {
                 "schema": {
@@ -173,8 +173,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Room created",
+          "200": {
+            "description": "Existing Room returned for the same command ID",
             "content": {
               "application/json": {
                 "schema": {
@@ -183,8 +183,8 @@
               }
             }
           },
-          "200": {
-            "description": "Existing Room returned for the same command ID",
+          "201": {
+            "description": "Room created",
             "content": {
               "application/json": {
                 "schema": {
@@ -379,8 +379,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Match created",
+          "200": {
+            "description": "Existing Match returned for the same command ID",
             "content": {
               "application/json": {
                 "schema": {
@@ -389,8 +389,8 @@
               }
             }
           },
-          "200": {
-            "description": "Existing Match returned for the same command ID",
+          "201": {
+            "description": "Match created",
             "content": {
               "application/json": {
                 "schema": {
@@ -479,8 +479,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Guess accepted as an Attempt",
+          "200": {
+            "description": "Existing outcome returned for the same command ID",
             "content": {
               "application/json": {
                 "schema": {
@@ -489,8 +489,8 @@
               }
             }
           },
-          "200": {
-            "description": "Existing outcome returned for the same command ID",
+          "201": {
+            "description": "Guess accepted as an Attempt",
             "content": {
               "application/json": {
                 "schema": {
@@ -542,8 +542,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Challenge committed",
+          "200": {
+            "description": "Idempotent replay",
             "content": {
               "application/json": {
                 "schema": {
@@ -552,8 +552,8 @@
               }
             }
           },
-          "200": {
-            "description": "Idempotent replay",
+          "201": {
+            "description": "Challenge committed",
             "content": {
               "application/json": {
                 "schema": {
@@ -591,6 +591,16 @@
             "$ref": "#/components/parameters/MatchId"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandIdentity"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Authorized snapshot",
@@ -856,6 +866,56 @@
           }
         }
       }
+    },
+    "/matches/{match_id}/next-round/": {
+      "post": {
+        "operationId": "advancePartyRound",
+        "summary": "Advance a Party match after a finished round",
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MatchId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandIdentity"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Viewer-authorized snapshot for the next round or finished Party match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/snapshot.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1002,33 +1062,7 @@
         }
       },
       "CreateRoomCommand": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "command_id",
-          "preset_id"
-        ],
-        "properties": {
-          "command_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "preset_id": {
-            "enum": [
-              "number_classic_5_v1",
-              "number_brain_burner_6_v1",
-              "color_classic_5_v1",
-              "color_permutation_8_v1"
-            ]
-          },
-          "challenge_source": {
-            "enum": [
-              "system",
-              "players"
-            ],
-            "default": "system"
-          }
-        }
+        "$ref": "./schemas/create-room-command.schema.json"
       },
       "CommitChallengeCommand": {
         "type": "object",
@@ -1069,6 +1103,8 @@
           "host_participant_id",
           "preset_id",
           "challenge_source",
+          "room_mode",
+          "rounds_count",
           "state",
           "latest_sequence",
           "latest_match_id",
@@ -1166,7 +1202,7 @@
           "members": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 2,
+            "maxItems": 8,
             "items": {
               "type": "object",
               "additionalProperties": false,
@@ -1196,6 +1232,17 @@
                 }
               }
             }
+          },
+          "room_mode": {
+            "enum": [
+              "duel",
+              "party"
+            ]
+          },
+          "rounds_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15
           }
         }
       },

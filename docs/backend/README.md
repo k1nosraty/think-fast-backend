@@ -87,3 +87,11 @@ not sufficient.
 For each task: migrations, tests, schemas/examples, admin/operational impact,
 security review proportional to the change, successful quality commands, and
 the root `AGENTS.md` handoff.
+
+## Local developer loop
+
+From the workspace root, prefer `./run-think-fast.sh`. From this repository,
+start dependencies with `docker compose up -d`, then run migrations and Daphne.
+If host port `5432` is occupied, export `POSTGRES_PORT=5433` for both Compose and
+every Django command. Run `uv run python scripts/check.py` before handoff and
+add `uv run python scripts/check_security.py` for security-sensitive work.

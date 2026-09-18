@@ -4,15 +4,14 @@ Authoritative backend for **Think Fast**, a fast competitive deduction game.
 Players solve number, color, and word challenges in solo or realtime matches.
 The server owns rules, secrets, timing, accepted attempts, feedback, and results.
 
-Backend Tasks T0–T7 are complete. MVP contracts are frozen at
-`v1.0.0-draft.1`; Solo Number and private realtime Friendly 1v1 are playable.
-The Room-to-rematch loop, safe playtest analytics, Color Classic and Color
-Permutation and safe player-authored Friendly challenges are implemented. Word
-game support is registered with a placeholder lexicon (licensed data pending).
-T8 hardening and the complete single-host validation baseline are complete.
-Production deployment approval remains blocked until the same operational gates
-are measured on the agreed production-like staging topology. T9 competitive
-planning is unblocked; this does not authorize a Production Beta release.
+T0–T7 are `Implemented` and `Unit-tested`; their bounded evidence is in
+[`docs/execution/BACKEND-TASKS.md`](docs/execution/BACKEND-TASKS.md). T10 Party
+Mode is additionally `E2E-verified` for 2–8 players. T8's single-host
+validation baseline is `Implemented` and `Unit-tested`, but no Backend feature
+is yet `Staging-verified` or `Production-approved`. Word remains gated behind
+licensed dictionary evidence. Cross-repository status and the next task are
+owned by the workspace [`TASKS.md`](../TASKS.md); after TF-05 the next task is
+TF-06 (CI completion).
 
 ## MVP
 
@@ -81,16 +80,36 @@ ephemeral coordination. WebSocket delivery never decides match state.
 ### Bootstrap a clean machine
 
 ```bash
-cp .env.example .env
 docker compose up -d
 uv sync --locked --dev
 uv run python manage.py migrate
 ```
 
-`manage.py` selects `config.settings.local`. Environment variables from `.env`
-are not loaded implicitly; export/source them in your shell or use your process
-manager. The checked-in local defaults match Compose and contain no deployable
-secret. Start with `uv run python manage.py runserver`.
+`manage.py` selects `config.settings.local`. The checked-in local defaults match
+Compose and contain no deployable secret, so `.env` is optional for a first
+run. Environment variables from `.env` are not loaded implicitly by Django. If
+you create one, export it before running Django:
+
+```bash
+cp .env.example .env
+set -a
+source .env
+set +a
+```
+
+Start the ASGI application with
+`uv run daphne -b 127.0.0.1 -p 8000 config.asgi:application`. When this
+repository is beside `think-fast-frontend`, the preferred command is
+`../run-think-fast.sh`, which starts the complete stack and applies migrations.
+
+If another PostgreSQL owns host port `5432`, keep it running and use a free
+port consistently for Compose and Django:
+
+```bash
+POSTGRES_PORT=5433 docker compose up -d
+POSTGRES_PORT=5433 uv run python manage.py migrate
+POSTGRES_PORT=5433 uv run daphne -b 127.0.0.1 -p 8000 config.asgi:application
+```
 
 ### Exercise the Solo API
 
@@ -179,7 +198,7 @@ uv run python manage.py apply_retention --apply --actor scheduled-retention
 contracts/openapi.json                 OpenAPI 3.1 baseline
 contracts/schemas/                     Versioned JSON Schemas
 contracts/fixtures/                    Canonical cross-team examples
-contracts/manifest.json                Validation manifest/version
+contracts/manifest.json                Source revision, fixture registry, bundle checksum
 scripts/validate_contracts.py          Dependency-free validator
 tests/contracts/test_contracts.py      Contract and semantic example tests
 config/settings/                       Explicit local/test/production settings
@@ -187,6 +206,11 @@ compose.yaml                           Local PostgreSQL and Redis
 Dockerfile                             Reproducible production ASGI image
 scripts/check.py                       Local/CI quality-gate entrypoint
 ```
+
+Backend owns this bundle. After an approved contract change, update the
+manifest revision/checksum, validate it, then replace the Frontend pin from
+this directory as one complete copy; do not hand-edit generated consumer
+artifacts.
 
 ## Working rule
 

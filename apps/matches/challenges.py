@@ -57,7 +57,14 @@ def _commit_challenge(
     now: datetime | None = None,
 ) -> tuple[Match, bool, bool]:
     current = now or timezone.now()
-    match = Match.objects.select_for_update().select_related("room").filter(pk=match_id).first()
+    # `room` is nullable for solo matches; lock only the match row so
+    # PostgreSQL does not attempt FOR UPDATE on the nullable outer-join side.
+    match = (
+        Match.objects.select_for_update(of=("self",))
+        .select_related("room")
+        .filter(pk=match_id)
+        .first()
+    )
     if match is None:
         raise GameAPIError("match_not_found", "Match was not found.", status_code=404)
     creator = Participant.objects.select_for_update().filter(match=match, guest=guest).first()

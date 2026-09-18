@@ -135,6 +135,16 @@ class PartyModeTests(TestCase):
         )
         self.assertTrue(attempt_p2.solved)
         match.refresh_from_db()
+        self.assertEqual(match.round_state, "active")
+        attempt_p3_final, match, _ = submit_party_guess(
+            guest=self.p3,
+            match_id=match.id,
+            command_id=uuid.uuid4(),
+            guess="72941",
+            now=active_time + timedelta(seconds=6),
+        )
+        self.assertTrue(attempt_p3_final.solved)
+        match.refresh_from_db()
         self.assertEqual(match.round_state, "round_finished")
 
         part_p2 = match.participants.get(guest=self.p2)
@@ -143,21 +153,61 @@ class PartyModeTests(TestCase):
 
         self.assertEqual(part_p2.score, 100)
         self.assertEqual(part_p2.round_score, 100)
-        self.assertEqual(part_p3.score, 0)
+        self.assertEqual(part_p3.score, 75)
         self.assertGreater(part_host.score, 0)
 
         p2_finish_snap = snapshot(match, self.p2)
         self.assertEqual(p2_finish_snap["result"]["revealed_secret"], "72941")
         self.assertIn("next_round", p2_finish_snap["available_actions"])
 
-        match = advance_party_round(guest=self.p2, match_id=match.id)
+        advance_command = uuid.uuid4()
+        match = advance_party_round(guest=self.p2, match_id=match.id, command_id=advance_command)
         self.assertEqual(match.round_number, 2)
         self.assertEqual(match.round_state, "creator_setup")
         self.assertEqual(match.creator.guest_id, self.p2.id)
+        self.assertIsNone(snapshot(match, self.p2)["result"])
 
         part_p2_r2 = match.participants.get(guest=self.p2)
         self.assertTrue(part_p2_r2.is_creator)
         self.assertEqual(part_p2_r2.attempt_count, 0)
+
+        replay = advance_party_round(guest=self.p2, match_id=match.id, command_id=advance_command)
+        self.assertEqual(replay.round_number, 2)
+
+    def test_party_guess_command_id_conflict_is_rejected(self) -> None:
+        room, _ = create_room(
+            guest=self.host,
+            command_id=uuid.uuid4(),
+            preset_id="number_classic_5_v1",
+            challenge_source=Room.ChallengeSource.PLAYERS,
+            room_mode="party",
+            rounds_count=3,
+        )
+        join_room(guest=self.p2, room_id=room.id, command_id=uuid.uuid4())
+        set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        match, _ = start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
+        now = timezone.now()
+        commit_party_secret(
+            guest=self.host, match_id=match.id, command_id=uuid.uuid4(), secret="72941", now=now
+        )
+        command_id = uuid.uuid4()
+        submit_party_guess(
+            guest=self.p2,
+            match_id=match.id,
+            command_id=command_id,
+            guess="78345",
+            now=now + timedelta(seconds=4),
+        )
+        with self.assertRaises(GameAPIError) as ctx:
+            submit_party_guess(
+                guest=self.p2,
+                match_id=match.id,
+                command_id=command_id,
+                guess="72941",
+                now=now + timedelta(seconds=5),
+            )
+        self.assertEqual(ctx.exception.default_code, "idempotency_conflict")
 
     def test_color_party_mode(self) -> None:
         room, _ = create_room(
@@ -325,6 +375,10 @@ class PartyModeTests(TestCase):
         self.assertIn(guess_resp.status_code, (200, 201))
         self.assertTrue(guess_resp.data["solved"])
 
-        next_resp = client_p2.post(f"/api/v1/matches/{match_id}/next-round/", format="json")
+        next_resp = client_p2.post(
+            f"/api/v1/matches/{match_id}/next-round/",
+            {"command_id": str(uuid.uuid4())},
+            format="json",
+        )
         self.assertEqual(next_resp.status_code, 200)
         self.assertEqual(next_resp.data["round_number"], 2)

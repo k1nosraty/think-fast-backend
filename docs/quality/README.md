@@ -53,6 +53,23 @@ type checks, Django checks, migration consistency, unit/integration tests, and
 contract validation. Tasks touching realtime/concurrency add their dedicated
 suites. T8 adds security, load, backup/restore, and staging smoke checks.
 
+The measurable Backend baseline is:
+
+```bash
+uv run python scripts/check.py
+```
+
+Security-sensitive work additionally runs:
+
+```bash
+uv run python scripts/check_security.py
+```
+
+Report any skipped, timed-out or environment-dependent command with its reason;
+never convert an unrun check into a pass. Realtime/concurrency behavior that
+depends on production adapters must be verified against real PostgreSQL/Redis
+when the task requires it.
+
 ## Playtest gates
 
 Gameplay parameters are evidence-driven. Record anonymized aggregate outcomes

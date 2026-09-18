@@ -41,7 +41,9 @@ def get_current_round_challenge(match: Match) -> Challenge | None:
 
 
 def pick_next_creator(
-    match: Match, exclude_participant: Participant | None = None
+    match: Match,
+    exclude_participant: Participant | None = None,
+    now: datetime | None = None,
 ) -> Participant | None:
     if match.room:
         member_guest_ids = list(
@@ -54,6 +56,17 @@ def pick_next_creator(
     else:
         participants = list(match.participants.all())
 
+    current_time = now or timezone.now()
+    participants = [
+        participant
+        for participant in participants
+        if participant.solve_state != Participant.SolveState.ABANDONED
+        and (
+            participant.connected
+            or participant.grace_expires_at is None
+            or participant.grace_expires_at > current_time
+        )
+    ]
     if not participants:
         return None
 
@@ -84,7 +97,12 @@ def commit_party_secret(
     now: datetime | None = None,
 ) -> tuple[Match, bool]:
     current = now or timezone.now()
-    match = Match.objects.select_for_update().select_related("room").filter(pk=match_id).first()
+    match = (
+        Match.objects.select_for_update(of=("self",))
+        .select_related("room")
+        .filter(pk=match_id)
+        .first()
+    )
     if match is None:
         raise GameAPIError("match_not_found", "Match was not found.", status_code=404)
 
@@ -341,11 +359,13 @@ def submit_party_guess(
             "creator_cannot_guess", "The creator cannot guess in their own round.", status_code=403
         )
 
-    request_hash = fingerprint({"guess": guess, "round": match.round_number})
-    prior = Attempt.objects.filter(
-        participant=participant, command_id=command_id, round_number=match.round_number
-    ).first()
+    request_hash = fingerprint({"guess": guess})
+    prior = Attempt.objects.filter(participant=participant, command_id=command_id).first()
     if prior:
+        if prior.request_fingerprint != request_hash:
+            raise GameAPIError(
+                "idempotency_conflict", "Command ID was already used with a different Guess."
+            )
         return prior, match, False
 
     if match.state == Match.State.COUNTDOWN and current >= match.started_at:
@@ -369,11 +389,14 @@ def submit_party_guess(
     if participant.solve_state != Participant.SolveState.PLAYING:
         raise GameAPIError("match_not_active", "You have already solved or ended this round.")
 
+    rules = rules_from_snapshot(match.rules)
+    if participant.attempt_count >= rules.attempt_limit:
+        raise GameAPIError("attempt_limit_reached", "Attempt limit has been reached.")
+
     if current >= match.deadline:
         finish_party_round(match, reason="deadline", now=current)
         raise GameAPIError("deadline_elapsed", "Round deadline has elapsed.")
 
-    rules = rules_from_snapshot(match.rules)
     adapter = adapter_for(rules.game_type)
     challenge = get_current_round_challenge(match)
     if challenge is None:
@@ -446,7 +469,17 @@ def submit_party_guess(
                 "round_number": match.round_number,
             },
         )
-        finish_party_round(match, reason="solved", now=current)
+        # Keep the round open while another guesser can still solve. This is
+        # what preserves placement scoring (1st/2nd/3rd) and lets concurrent
+        # submissions race against the same authoritative round.
+        remaining_guessers = Participant.objects.filter(
+            match=match,
+            solve_state=Participant.SolveState.PLAYING,
+        )
+        if match.creator_id is not None:
+            remaining_guessers = remaining_guessers.exclude(pk=match.creator_id)
+        if not remaining_guessers.exists():
+            finish_party_round(match, reason="solved", now=current)
 
     return attempt, match, True
 
@@ -456,12 +489,34 @@ def advance_party_round(
     *,
     guest: GuestIdentity,
     match_id: uuid.UUID,
+    command_id: uuid.UUID,
     now: datetime | None = None,
 ) -> Match:
     current = now or timezone.now()
-    match = Match.objects.select_for_update().select_related("room").filter(pk=match_id).first()
+    match = (
+        Match.objects.select_for_update(of=("self",))
+        .select_related("room")
+        .filter(pk=match_id)
+        .first()
+    )
     if match is None:
         raise GameAPIError("match_not_found", "Match was not found.", status_code=404)
+
+    # The command must replay identically after the transition changes the
+    # current round number.
+    request_hash = fingerprint({"match_id": str(match_id)})
+    prior = check_command_prior(
+        guest=guest,
+        command_id=command_id,
+        operation="next_round",
+        request_hash=request_hash,
+    )
+    if prior is not None:
+        if prior.match_id != match.id:
+            raise GameAPIError(
+                "idempotency_conflict", "Command ID was already used with a different request."
+            )
+        return match
 
     caller = Participant.objects.select_for_update().filter(match=match, guest=guest).first()
     if caller is None:
@@ -491,9 +546,17 @@ def advance_party_round(
             room.state = Room.State.READY_CHECK
             room.save(update_fields=["state", "updated_at"])
             RoomMembership.objects.filter(room=room).update(ready=False)
+        CommandRecord.objects.create(
+            guest=guest,
+            command_id=command_id,
+            operation="next_round",
+            request_fingerprint=request_hash,
+            match=match,
+            room=match.room,
+        )
         return match
 
-    next_creator = pick_next_creator(match, exclude_participant=match.creator)
+    next_creator = pick_next_creator(match, exclude_participant=match.creator, now=current)
     if next_creator is None:
         raise GameAPIError("no_players", "No active players remaining.")
 
@@ -545,5 +608,13 @@ def advance_party_round(
             "creator_display_name": next_creator.display_name,
             "expires_at": match.setup_expires_at.isoformat().replace("+00:00", "Z"),
         },
+    )
+    CommandRecord.objects.create(
+        guest=guest,
+        command_id=command_id,
+        operation="next_round",
+        request_fingerprint=request_hash,
+        match=match,
+        room=match.room,
     )
     return match

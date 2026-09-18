@@ -8,6 +8,7 @@ dependency-free makes the frozen examples immediately verifiable.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -20,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
 # Keep in sync with apps/__init__.py CONTRACT_VERSION
 CONTRACT_VERSION = "v1.0.0-draft.1"
+CONTRACT_REVISION = "v1.0.0-draft.1-r2"
+CANONICAL_REPOSITORY = "think-fast-backend"
 
 
 class ContractValidationError(ValueError):
@@ -31,6 +34,22 @@ def load_json(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ContractValidationError(f"cannot load {path.relative_to(ROOT)}: {exc}") from exc
+
+
+def bundle_sha256(contracts: Path | None = None) -> str:
+    """Hash every canonical JSON artifact except the self-referential manifest."""
+    contracts = CONTRACTS if contracts is None else contracts
+    digest = hashlib.sha256()
+    paths = sorted(
+        path for path in contracts.rglob("*.json") if path != contracts / "manifest.json"
+    )
+    for path in paths:
+        relative = path.relative_to(contracts).as_posix().encode()
+        digest.update(relative)
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _pointer(document: Any, fragment: str) -> Any:
@@ -202,23 +221,33 @@ def validate_openapi(path: Path) -> None:
         raise ContractValidationError("openapi.json: expected OpenAPI 3.1.0")
     if document.get("info", {}).get("version") != CONTRACT_VERSION:
         raise ContractValidationError("openapi.json: contract version mismatch")
-    required_paths = {
+    implemented_paths = {
         "/guest-sessions/",
         "/game-definitions/",
         "/solo-matches/",
         "/rooms/",
+        "/rooms/by-code/{join_code}/",
+        "/rooms/{room_id}/",
         "/rooms/{room_id}/join/",
+        "/rooms/{room_id}/kick/",
+        "/rooms/{room_id}/leave/",
         "/rooms/{room_id}/ready/",
+        "/rooms/{room_id}/rules/",
         "/rooms/{room_id}/start/",
         "/matches/{match_id}/guesses/",
         "/matches/{match_id}/challenges/",
         "/matches/{match_id}/snapshot/",
         "/matches/{match_id}/leave/",
+        "/matches/{match_id}/next-round/",
         "/matches/{match_id}/rematch/",
     }
-    missing = required_paths - set(document.get("paths", {}))
-    if missing:
-        raise ContractValidationError(f"openapi.json: missing paths {sorted(missing)}")
+    published_paths = set(document.get("paths", {}))
+    if published_paths != implemented_paths:
+        missing = sorted(implemented_paths - published_paths)
+        unexpected = sorted(published_paths - implemented_paths)
+        raise ContractValidationError(
+            f"openapi.json: path inventory mismatch; missing={missing}, unexpected={unexpected}"
+        )
     operation_ids: list[str] = []
     for path_item in document["paths"].values():
         for method, operation in path_item.items():
@@ -251,10 +280,36 @@ def validate_contracts() -> int:
     manifest = load_json(manifest_path)
     if manifest.get("contract_version") != CONTRACT_VERSION:
         raise ContractValidationError("manifest: unexpected contract version")
+    expected_source = {
+        "repository": CANONICAL_REPOSITORY,
+        "revision": CONTRACT_REVISION,
+    }
+    if manifest.get("source") != expected_source:
+        raise ContractValidationError(f"manifest: expected source {expected_source}")
+    actual_digest = bundle_sha256()
+    if manifest.get("bundle_sha256") != actual_digest:
+        raise ContractValidationError(
+            "manifest: bundle_sha256 does not match canonical JSON artifacts; "
+            f"expected {actual_digest}"
+        )
     validate_openapi(CONTRACTS / manifest["openapi"])
 
+    entries = manifest.get("fixtures", [])
+    registered = [entry.get("path") for entry in entries]
+    if len(registered) != len(set(registered)):
+        raise ContractValidationError("manifest: duplicate fixture registration")
+    discovered = {
+        path.relative_to(CONTRACTS).as_posix() for path in (CONTRACTS / "fixtures").rglob("*.json")
+    }
+    if set(registered) != discovered:
+        raise ContractValidationError(
+            "manifest: fixture registry mismatch; "
+            f"missing={sorted(discovered - set(registered))}, "
+            f"unexpected={sorted(set(registered) - discovered)}"
+        )
+
     count = 0
-    for entry in manifest.get("fixtures", []):
+    for entry in entries:
         fixture_path = CONTRACTS / entry["path"]
         schema_path = CONTRACTS / entry["schema"]
         fixture = load_json(fixture_path)

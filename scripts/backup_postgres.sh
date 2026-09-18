@@ -16,6 +16,7 @@ pg_dump \
   --port "$POSTGRES_PORT" \
   --username "$POSTGRES_USER" \
   --dbname "$POSTGRES_DB" \
+  --no-password \
   --format custom \
   --compress 9 \
   --no-owner \

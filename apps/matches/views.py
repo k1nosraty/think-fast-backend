@@ -154,7 +154,11 @@ class NextRoundView(APIView):
     throttle_scope = "room_command"
 
     def post(self, request: Request, match_id: uuid.UUID) -> Response:
-        match = advance_party_round(guest=authenticated_guest(request), match_id=match_id)
+        serializer = CommandSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        match = advance_party_round(
+            guest=authenticated_guest(request), match_id=match_id, **serializer.validated_data
+        )
         return Response(snapshot(match, authenticated_guest(request)))
 
 
