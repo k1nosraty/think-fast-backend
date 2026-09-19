@@ -31,6 +31,9 @@ JOIN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, object]:
+    rules = rules_for_mode(room.preset_id, "friendly")
+    if rules is None:
+        raise GameAPIError("invalid_request", "Room rules are not available.", status_code=500)
     members = list(room.memberships.all())
     host_membership = next(member for member in members if member.guest_id == room.host_id)
     viewer_membership = (
@@ -52,6 +55,7 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         "host_participant_id": str(host_membership.id),
         "viewer_participant_id": str(viewer_membership.id) if viewer_membership else None,
         "preset_id": room.preset_id,
+        "rules": rules.snapshot(),
         "challenge_source": room.challenge_source,
         "room_mode": room.room_mode,
         "rounds_count": room.rounds_count,
@@ -403,8 +407,11 @@ def start_room(
     if room.host_id != guest.id:
         raise GameAPIError("not_room_host", "Only the room host can start.", status_code=403)
     members = list(room.memberships.select_for_update())
-    if len(members) < 2 or not all(member.ready for member in members):
-        raise GameAPIError("not_ready", "At least two ready players are required.")
+    minimum_players = 2 if room.room_mode == "duel" else 3
+    if len(members) < minimum_players or not all(member.ready for member in members):
+        raise GameAPIError(
+            "not_ready", f"At least {minimum_players} ready players are required."
+        )
     if room.room_mode == "duel" and len(members) != 2:
         raise GameAPIError("not_ready", "Exactly two ready players are required for Duel mode.")
     if room.state != Room.State.READY_CHECK:
@@ -516,7 +523,11 @@ def update_room_rules(*, guest: GuestIdentity, room_id: uuid.UUID, preset_id: st
         raise GameAPIError("invalid_request", "Unknown preset_id.", status_code=400)
     room.preset_id = preset_id
     RoomMembership.objects.filter(room=room).update(ready=False)
-    room.state = Room.State.WAITING
+    room.state = (
+        Room.State.READY_CHECK
+        if RoomMembership.objects.filter(room=room).count() >= 2
+        else Room.State.WAITING
+    )
     room.save(update_fields=["preset_id", "state", "updated_at"])
     record_room_event(
         room=room,

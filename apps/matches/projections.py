@@ -130,6 +130,16 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 "required_count": 2,
             }
     participants = list(match.participants.all())
+    if result is not None and match.result.winner_participant_ids:
+        winner = next(
+            (item for item in participants if str(item.id) in match.result.winner_participant_ids),
+            None,
+        )
+        result["winner_solve_duration_seconds"] = (
+            max(0, int((winner.solved_at - match.started_at).total_seconds()))
+            if winner is not None and winner.solved_at is not None
+            else None
+        )
     role = "host" if match.room is not None and match.room.host_id == guest.id else "player"
     return {
         "contract_version": CONTRACT_VERSION,
@@ -144,6 +154,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         "rules": match.rules,
         "server_time": iso(timezone.now()),
         "started_at": iso(match.started_at),
+        "finished_at": iso(match.finished_at),
         "deadline": iso(match.deadline),
         "viewer": {
             "participant_id": str(participant.id),
@@ -160,7 +171,14 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 else ("connected" if item.connected else "disconnected"),
                 "attempt_count": item.attempt_count,
                 "solve_state": item.solve_state,
+                "solve_duration_seconds": (
+                    max(0, int((item.solved_at - match.started_at).total_seconds()))
+                    if item.solved_at is not None
+                    else None
+                ),
                 "score": item.score,
+                "round_score": item.round_score,
+                "round_rank": item.round_rank,
                 "is_creator": item.is_creator,
             }
             for item in participants

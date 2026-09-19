@@ -47,6 +47,30 @@ class PartyModeTests(TestCase):
             join_room(guest=p9, room_id=room.id, command_id=uuid.uuid4())
         self.assertEqual(ctx.exception.default_code, "room_full")
 
+    def test_party_room_requires_three_ready_players_to_start(self) -> None:
+        room, _ = create_room(
+            guest=self.host,
+            command_id=uuid.uuid4(),
+            preset_id="number_classic_5_v1",
+            challenge_source=Room.ChallengeSource.PLAYERS,
+            room_mode="party",
+            rounds_count=3,
+        )
+        join_room(guest=self.p2, room_id=room.id, command_id=uuid.uuid4())
+        set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+
+        with self.assertRaises(GameAPIError) as ctx:
+            start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
+        self.assertEqual(ctx.exception.default_code, "not_ready")
+
+        join_room(guest=self.p3, room_id=room.id, command_id=uuid.uuid4())
+        set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p3, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        match, _ = start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
+        self.assertEqual(match.participants.count(), 3)
+
     def test_party_lifecycle_end_to_end(self) -> None:
         room, _ = create_room(
             guest=self.host,
@@ -98,7 +122,7 @@ class PartyModeTests(TestCase):
 
         expected_state = (
             Match.State.COUNTDOWN
-            if getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 3) > 0
+            if getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 5) > 0
             else Match.State.ACTIVE
         )
         self.assertEqual(match.state, expected_state)
@@ -184,8 +208,10 @@ class PartyModeTests(TestCase):
             rounds_count=3,
         )
         join_room(guest=self.p2, room_id=room.id, command_id=uuid.uuid4())
+        join_room(guest=self.p3, room_id=room.id, command_id=uuid.uuid4())
         set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p3, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         match, _ = start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
         now = timezone.now()
         commit_party_secret(
@@ -219,8 +245,10 @@ class PartyModeTests(TestCase):
             rounds_count=3,
         )
         join_room(guest=self.p2, room_id=room.id, command_id=uuid.uuid4())
+        join_room(guest=self.p3, room_id=room.id, command_id=uuid.uuid4())
         set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p3, room_id=room.id, command_id=uuid.uuid4(), ready=True)
 
         match, _ = start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
         now = timezone.now()
@@ -242,6 +270,14 @@ class PartyModeTests(TestCase):
             now=active_time,
         )
         self.assertTrue(attempt.solved)
+        attempt_p3, match, _ = submit_party_guess(
+            guest=self.p3,
+            match_id=match.id,
+            command_id=uuid.uuid4(),
+            guess=color_secret,
+            now=active_time + timedelta(seconds=1),
+        )
+        self.assertTrue(attempt_p3.solved)
         match.refresh_from_db()
         self.assertEqual(match.round_state, "round_finished")
         p2_snap = snapshot(match, self.p2)
@@ -257,8 +293,10 @@ class PartyModeTests(TestCase):
             rounds_count=3,
         )
         join_room(guest=self.p2, room_id=room.id, command_id=uuid.uuid4())
+        join_room(guest=self.p3, room_id=room.id, command_id=uuid.uuid4())
         set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p3, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         match, _ = start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
 
         now = timezone.now()
@@ -289,8 +327,10 @@ class PartyModeTests(TestCase):
             rounds_count=3,
         )
         join_room(guest=self.p2, room_id=room.id, command_id=uuid.uuid4())
+        join_room(guest=self.p3, room_id=room.id, command_id=uuid.uuid4())
         set_ready(guest=self.host, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         set_ready(guest=self.p2, room_id=room.id, command_id=uuid.uuid4(), ready=True)
+        set_ready(guest=self.p3, room_id=room.id, command_id=uuid.uuid4(), ready=True)
         match, _ = start_room(guest=self.host, room_id=room.id, command_id=uuid.uuid4())
 
         now = timezone.now()
@@ -321,6 +361,8 @@ class PartyModeTests(TestCase):
         client_host.force_authenticate(user=self.host)
         client_p2 = APIClient()
         client_p2.force_authenticate(user=self.p2)
+        client_p3 = APIClient()
+        client_p3.force_authenticate(user=self.p3)
 
         resp = client_host.post(
             "/api/v1/rooms/",
@@ -343,12 +385,24 @@ class PartyModeTests(TestCase):
         )
         self.assertEqual(join_resp.status_code, 200)
 
+        join_p3_resp = client_p3.post(
+            f"/api/v1/rooms/{room_id}/join/",
+            {"command_id": str(uuid.uuid4())},
+            format="json",
+        )
+        self.assertEqual(join_p3_resp.status_code, 200)
+
         client_host.post(
             f"/api/v1/rooms/{room_id}/ready/",
             {"command_id": str(uuid.uuid4()), "ready": True},
             format="json",
         )
         client_p2.post(
+            f"/api/v1/rooms/{room_id}/ready/",
+            {"command_id": str(uuid.uuid4()), "ready": True},
+            format="json",
+        )
+        client_p3.post(
             f"/api/v1/rooms/{room_id}/ready/",
             {"command_id": str(uuid.uuid4()), "ready": True},
             format="json",
@@ -374,6 +428,14 @@ class PartyModeTests(TestCase):
         )
         self.assertIn(guess_resp.status_code, (200, 201))
         self.assertTrue(guess_resp.data["solved"])
+
+        guess_p3_resp = client_p3.post(
+            f"/api/v1/matches/{match_id}/guesses/",
+            {"command_id": str(uuid.uuid4()), "guess": "72941"},
+            format="json",
+        )
+        self.assertIn(guess_p3_resp.status_code, (200, 201))
+        self.assertTrue(guess_p3_resp.data["solved"])
 
         next_resp = client_p2.post(
             f"/api/v1/matches/{match_id}/next-round/",

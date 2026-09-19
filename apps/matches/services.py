@@ -395,7 +395,7 @@ def _submit_guess(
             .exclude(pk=participant.pk)
             .exists()
         )
-        if other_solved:
+        if other_solved or (match.room_id and match.room.room_mode == "duel"):
             _finish_friendly(match, reason="solved", now=now)
         elif match.state == Match.State.ACTIVE:
             match.state = Match.State.FINISHING

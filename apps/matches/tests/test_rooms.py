@@ -316,6 +316,8 @@ def test_room_snapshot_includes_members_and_rematch_state() -> None:
     assert snapshot["room_id"] == str(room.id)
     assert snapshot["join_code"] == room.join_code
     assert snapshot["latest_match_id"] == str(match.id)
+    assert snapshot["rules"]["sequence_length"] == 5
+    assert snapshot["rules"]["match_mode"] == "friendly"
     assert snapshot["rematch"]["state"] == "pending"
     host_member = RoomMembership.objects.get(room=room, guest=host)
     assert snapshot["rematch"]["requester_participant_id"] == str(host_member.id)
@@ -401,7 +403,7 @@ def test_update_room_rules_changes_preset_resets_ready_and_state() -> None:
     result = update_room_rules(guest=host, room_id=room.id, preset_id="number_brain_burner_6_v1")
     result.refresh_from_db()
     assert result.preset_id == "number_brain_burner_6_v1"
-    assert result.state == Room.State.WAITING
+    assert result.state == Room.State.READY_CHECK
     assert not RoomMembership.objects.filter(room=room, ready=True).exists()
 
 

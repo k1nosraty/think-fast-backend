@@ -156,7 +156,7 @@ def commit_party_secret(
         committed_at=current,
     )
 
-    countdown_seconds = getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 3)
+    countdown_seconds = getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 5)
     round_duration = getattr(rules, "match_deadline_seconds", DEFAULT_ROUND_DURATION_SECONDS)
     started_at = current + timedelta(seconds=countdown_seconds)
     deadline = started_at + timedelta(seconds=round_duration)

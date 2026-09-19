@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.accounts.models import GuestIdentity
 from apps.matches.errors import GameAPIError
 from apps.matches.models import Challenge, Match, Participant, Result, Room
+from apps.matches.projections import snapshot
 from apps.matches.rooms import create_room, join_room, set_ready, start_room
 from apps.matches.services import abandon, create_solo, refresh_match_state, submit_guess
 
@@ -126,6 +127,34 @@ def test_friendly_finish_on_deadline_during_submit() -> None:
     match.refresh_from_db()
     assert match.state == Match.State.FINISHED
     assert Result.objects.get(match=match).reason == "deadline"
+
+
+@pytest.mark.django_db
+def test_duel_finishes_immediately_when_first_player_solves() -> None:
+    host, _, match = _friendly()
+    solved_at = match.started_at + timedelta(seconds=1)
+
+    attempt, updated, created = submit_guess(
+        guest=host,
+        match_id=match.id,
+        command_id=_command(),
+        guess="12345",
+        now=solved_at,
+    )
+
+    assert created is True
+    assert attempt is not None and attempt.solved is True
+    assert updated.state == Match.State.FINISHED
+    result = Result.objects.get(match=match)
+    assert result.reason == "solved"
+    assert result.winner_participant_ids == [str(match.participants.get(guest=host).id)]
+    assert snapshot(match, host)["result"]["winner_solve_duration_seconds"] == 1
+    assert snapshot(match, host)["finished_at"] is not None
+    winner_id = str(match.participants.get(guest=host).id)
+    winner_snapshot = next(
+        item for item in snapshot(match, host)["participants"] if item["participant_id"] == winner_id
+    )
+    assert winner_snapshot["solve_duration_seconds"] == 1
 
 
 @pytest.mark.django_db
