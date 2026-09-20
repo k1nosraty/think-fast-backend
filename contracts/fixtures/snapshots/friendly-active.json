@@ -57,6 +57,7 @@
       "solved": false
     }
   ],
+  "challenge_setup": null,
   "result": null,
   "latest_sequence": 18,
   "available_actions": ["submit_guess", "leave"]

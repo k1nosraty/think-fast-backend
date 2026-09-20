@@ -1,18 +1,21 @@
 # Think Fast Backend
 
 Authoritative backend for **Think Fast**, a fast competitive deduction game.
-Players solve number, color, and later word challenges in solo or realtime
-matches. The server owns rules, secrets, timing, accepted attempts, feedback,
-and results.
+Players solve number, color, and word challenges in solo or realtime matches.
+The server owns rules, secrets, timing, accepted attempts, feedback, and results.
 
-Backend Task T0 is complete: MVP decisions, OpenAPI, JSON Schemas, canonical
-fixtures, and dependency-free contract tests are frozen at
-`v1.0.0-draft.1`. Gameplay implementation has not started. The next task is T1;
-do not skip directly to T2.
+T0–T7 are `Implemented` and `Unit-tested`; their bounded evidence is in
+[`docs/execution/BACKEND-TASKS.md`](docs/execution/BACKEND-TASKS.md). T10 Party
+Mode is additionally `E2E-verified` for 3–8 players. T8's single-host
+validation baseline is `Implemented` and `Unit-tested`, but no Backend feature
+is yet `Staging-verified` or `Production-approved`. Word remains gated behind
+licensed dictionary evidence. Cross-repository status and the next task are
+owned by the workspace [`TASKS.md`](../TASKS.md); the next cross-repository task
+is TF-07 (structured user playtest), with TF-08 (staging/release gate) after it.
 
 ## MVP
 
-The implementation baseline is deliberately narrow:
+The original MVP baseline was deliberately narrow:
 
 - responsive web/PWA client (maintained by the frontend team);
 - guest-first identity with an account upgrade path;
@@ -22,8 +25,13 @@ The implementation baseline is deliberately narrow:
 - room, ready, countdown, realtime progress, reconnect, result, and rematch;
 - REST commands/snapshots plus versioned WebSocket events.
 
-Color variants follow after the 1v1 core is reliable. Player-authored duels and
-Word are explicit expansion work, not prerequisites for the first playable MVP.
+Everything above is `Implemented · Unit-tested`. T6 (Color Classic and
+Permutation), T7 (player-authored friendly challenges) and T10 (Party Mode) were
+delivered after that baseline and are `Implemented · Unit-tested` as well; T10 is
+additionally `E2E-verified`. Word is **not** shippable: the bounded T7 spike
+returned NO-GO for production and the preset is therefore absent from
+`apps.games.domain.CREATABLE_PRESET_IDS`, so `/game-definitions/` advertises it
+as a prototype that cannot be instantiated.
 Ranked, teams, tournaments, chat, monetization, and microservices are later.
 
 ## Read this first
@@ -41,6 +49,7 @@ Role-specific handoff:
 
 - [Backend guide](docs/backend/README.md)
 - [Quality strategy](docs/quality/README.md)
+- [Production operations and T8 evidence](docs/operations/README.md)
 - [Documentation map and source-of-truth rules](docs/README.md)
 
 AI agents must read [AGENTS.md](AGENTS.md) before acting. More-specific
@@ -65,89 +74,148 @@ manage transactions and lifecycle, call evaluators, persist results, and emit
 events. PostgreSQL is the source of truth; Redis supports realtime delivery and
 ephemeral coordination. WebSocket delivery never decides match state.
 
-## Build, validate, and run the current scaffold
+## Build, validate, and run
 
 ### Requirements
 
-- Python with `venv` and `pip`
-- No PostgreSQL or Redis is required in T0
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/) 0.11.33 or compatible
+- Docker with Compose for local PostgreSQL 17.11 and Redis 7.4.11
 
-The repository currently retains the original scaffold dependency file. T1
-must verify/pin the supported Python/Django toolchain and replace this temporary
-workflow; do not treat it as the final production build.
-
-### Create the local environment
-
-Linux/macOS:
+### Bootstrap a clean machine
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+docker compose up -d
+uv sync --locked --dev
+uv run python manage.py migrate
 ```
 
-Windows PowerShell:
-
-```powershell
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-### Validate T0 contracts and tests
-
-These checks use only Python's standard library and can run before installing
-Django:
+`manage.py` selects `config.settings.local`. The checked-in local defaults match
+Compose and contain no deployable secret, so `.env` is optional for a first
+run. Environment variables from `.env` are not loaded implicitly by Django. If
+you create one, export it before running Django:
 
 ```bash
-python scripts/validate_contracts.py
-python -m unittest discover -s tests/contracts -p "test_*.py" -v
+cp .env.example .env
+set -a
+source .env
+set +a
 ```
 
-Expected T0 result:
+Start the ASGI application with
+`uv run daphne -b 127.0.0.1 -p 8000 config.asgi:application`. When this
+repository is beside `think-fast-frontend`, the preferred command is
+`../run-think-fast.sh`, which starts the complete stack and applies migrations.
+
+If another PostgreSQL owns host port `5432`, keep it running and use a free
+port consistently for Compose and Django:
+
+```bash
+POSTGRES_PORT=5433 docker compose up -d
+POSTGRES_PORT=5433 uv run python manage.py migrate
+POSTGRES_PORT=5433 uv run daphne -b 127.0.0.1 -p 8000 config.asgi:application
+```
+
+### Exercise the Solo API
+
+Create a guest, then send its token as `Authorization: Bearer <token>`:
 
 ```text
-Contract validation passed: 1 OpenAPI document, 7 canonical fixtures
-Ran 6 tests
-OK
+POST /api/v1/guest-sessions/
+GET  /api/v1/game-definitions/
+POST /api/v1/solo-matches/
+POST /api/v1/matches/{match_id}/guesses/
+GET  /api/v1/matches/{match_id}/snapshot/
+POST /api/v1/matches/{match_id}/leave/
 ```
 
-### Check and run the Django scaffold
+Friendly lobby commands add:
 
-After installing `requirements.txt`:
+```text
+POST /api/v1/rooms/
+POST /api/v1/rooms/{room_id}/join/
+POST /api/v1/rooms/{room_id}/ready/
+POST /api/v1/rooms/{room_id}/start/
+POST /api/v1/rooms/{room_id}/leave/
+POST /api/v1/matches/{match_id}/rematch/
+WS   /ws/v1/matches/{match_id}/
+WS   /ws/v1/rooms/{room_id}/
+```
+
+Native clients may send `Authorization: Bearer <guest token>` in the WebSocket
+handshake. Browsers should request subprotocols `think-fast` and
+`ticket.<token>`, where `<token>` is the short-lived single-use ticket returned
+by `POST /api/v1/guest-sessions/ws-ticket/`. A `bearer.<token>` subprotocol is
+deliberately rejected so a long-lived credential never appears in WebSocket
+metadata; query-string tokens are rejected.
+
+Clients send `{"type":"resync","last_sequence":N}` after a detected gap.
+Stored authorized events after `N` are replayed in order. Duplicates are valid
+at-least-once delivery and must be ignored by sequence; an invalid cursor yields
+`system.resync_required`, after which the client fetches the HTTP Snapshot.
+
+Create a local demo identity and active match after migrations:
 
 ```bash
-python manage.py check
-python manage.py migrate
-python manage.py runserver
+uv run python manage.py seed_demo
+uv run python manage.py seed_playtest
 ```
 
-This starts only the original Django scaffold; no gameplay endpoint exists yet.
+### Run every quality gate
 
-### Production build status
+```bash
+uv run python scripts/check.py
+uv run python scripts/check_security.py
+```
 
-There is intentionally no supported production image/build in T0. Task T1 owns
-the pinned dependency lock, split settings, PostgreSQL/Redis local stack, CI,
-container/build procedure, production checks, and reproducible deployment
-artifact. Deploying the current development settings is unsupported.
+This runs formatting, lint, strict type checking, Django checks, migration drift,
+contract validation, pytest and the 85% coverage threshold.
 
-## Current scaffold and contract assets
+### Build the production image
 
-The existing Django settings are development-only and contain scaffold values.
-Task T1 replaces them with environment-based settings, PostgreSQL/Redis,
-tooling, CI, and a reproducible local stack. Until T1 is complete, do not deploy
-the project.
+```bash
+docker build --tag think-fast-backend:t8 .
+```
+
+The image starts Daphne with `config.settings.production`. It refuses to boot
+unless `DJANGO_SECRET_KEY` is strong and `DJANGO_ALLOWED_HOSTS`,
+`POSTGRES_PASSWORD`, `REDIS_URL`, and `GAME_SECRET_ENCRYPTION_KEY` are explicit.
+Run migrations as a separate release step before application replicas.
+
+Run `uv run python manage.py run_reliability_worker --limit 100 --interval 1` as a single long-running worker; it loops with configurable interval, shuts down cleanly on SIGTERM, and converges persisted countdown/deadline and disconnect-grace state after process restarts plus retries due outbox rows. For one-shot execution, `uv run python manage.py sweep_reliability --limit 100` (or with `--loop --interval 1`) remains available. `publish_outbox` is available when only delivery retry is desired.
+
+Export shareable aggregate playtest data without raw guesses or secrets:
+
+```bash
+uv run python manage.py export_playtest_analytics --format json --since-days 30
+```
+
+Preview and apply privacy retention from a singleton scheduled worker:
+
+```bash
+uv run python manage.py apply_retention
+uv run python manage.py apply_retention --apply --actor scheduled-retention
+```
+
+## Foundation and contract assets
 
 ```text
 contracts/openapi.json                 OpenAPI 3.1 baseline
 contracts/schemas/                     Versioned JSON Schemas
 contracts/fixtures/                    Canonical cross-team examples
-contracts/manifest.json                Validation manifest/version
+contracts/manifest.json                Source revision, fixture registry, bundle checksum
 scripts/validate_contracts.py          Dependency-free validator
 tests/contracts/test_contracts.py      Contract and semantic example tests
+config/settings/                       Explicit local/test/production settings
+compose.yaml                           Local PostgreSQL and Redis
+Dockerfile                             Reproducible production ASGI image
+scripts/check.py                       Local/CI quality-gate entrypoint
 ```
+
+Backend owns this bundle. After an approved contract change, update the
+manifest revision/checksum, validate it, then replace the Frontend pin from
+this directory as one complete copy; do not hand-edit generated consumer
+artifacts.
 
 ## Working rule
 

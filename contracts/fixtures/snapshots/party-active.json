@@ -1,0 +1,75 @@
+{
+  "contract_version": "v1.0.0-draft.1",
+  "match_id": "54fd9228-bb06-418a-bc77-a08f806c3666",
+  "room_id": "cc848477-5299-44ef-8679-d6f3080f7666",
+  "state": "active",
+  "rules": {
+    "preset_id": "number_classic_5_v1",
+    "game_type": "number",
+    "match_mode": "friendly",
+    "schema_version": 1,
+    "evaluator_version": 1,
+    "sequence_length": 5,
+    "allow_leading_zero": false,
+    "allow_duplicates": true,
+    "max_symbol_repetition": 2,
+    "feedback_policy": "positional",
+    "history_policy": {"type": "full"},
+    "match_deadline_seconds": 180,
+    "attempt_limit": 12
+  },
+  "server_time": "2026-09-18T10:01:30Z",
+  "started_at": "2026-09-18T10:00:00Z",
+  "deadline": "2026-09-18T10:03:00Z",
+  "viewer": {
+    "participant_id": "16170fa3-f6ea-4fdf-8851-d3c9d2ad6666",
+    "display_name": "Mina",
+    "role": "player"
+  },
+  "participants": [
+    {
+      "participant_id": "a191b028-2672-420b-af19-67c922e86666",
+      "display_name": "Sara",
+      "avatar_id": "avatar_01",
+      "connection_state": "connected",
+      "attempt_count": 0,
+      "solve_state": "playing",
+      "score": 2,
+      "is_creator": true
+    },
+    {
+      "participant_id": "16170fa3-f6ea-4fdf-8851-d3c9d2ad6666",
+      "display_name": "Mina",
+      "avatar_id": "avatar_02",
+      "connection_state": "connected",
+      "attempt_count": 2,
+      "solve_state": "playing",
+      "score": 4,
+      "is_creator": false
+    },
+    {
+      "participant_id": "f807e9db-5896-464f-803c-16b4627a6666",
+      "display_name": "Reza",
+      "avatar_id": "avatar_03",
+      "connection_state": "connected",
+      "attempt_count": 1,
+      "solve_state": "playing",
+      "score": 3,
+      "is_creator": false
+    }
+  ],
+  "own_attempts": [],
+  "challenge_setup": null,
+  "result": null,
+  "latest_sequence": 12,
+  "available_actions": ["submit_guess", "leave"],
+  "round_number": 2,
+  "total_rounds": 5,
+  "creator_participant_id": "a191b028-2672-420b-af19-67c922e86666",
+  "scores": {
+    "a191b028-2672-420b-af19-67c922e86666": 2,
+    "16170fa3-f6ea-4fdf-8851-d3c9d2ad6666": 4,
+    "f807e9db-5896-464f-803c-16b4627a6666": 3
+  },
+  "round_state": "active"
+}

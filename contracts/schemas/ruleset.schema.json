@@ -1,33 +1,60 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://think-fast.local/contracts/v1/ruleset.schema.json",
-  "title": "NumberRuleSetSnapshot",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "preset_id", "game_type", "match_mode", "schema_version",
-    "evaluator_version", "sequence_length", "allow_leading_zero",
-    "allow_duplicates", "max_symbol_repetition", "feedback_policy",
-    "history_policy", "match_deadline_seconds", "attempt_limit"
-  ],
-  "properties": {
-    "preset_id": {"type": "string", "minLength": 1},
-    "game_type": {"const": "number"},
-    "match_mode": {"enum": ["practice", "friendly"]},
-    "schema_version": {"const": 1},
-    "evaluator_version": {"const": 1},
-    "sequence_length": {"enum": [5, 6]},
-    "allow_leading_zero": {"const": false},
-    "allow_duplicates": {"const": true},
-    "max_symbol_repetition": {"const": 2},
-    "feedback_policy": {"const": "positional"},
-    "history_policy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["type"],
-      "properties": {"type": {"const": "full"}}
+  "title": "RuleSetSnapshot",
+  "oneOf": [
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["preset_id", "game_type", "match_mode", "schema_version", "evaluator_version", "sequence_length", "allow_leading_zero", "allow_duplicates", "max_symbol_repetition", "feedback_policy", "history_policy", "match_deadline_seconds", "attempt_limit"],
+      "properties": {
+        "preset_id": {"enum": ["number_classic_5_v1", "number_brain_burner_6_v1"]},
+        "game_type": {"const": "number"}, "match_mode": {"enum": ["practice", "friendly"]},
+        "schema_version": {"const": 1}, "evaluator_version": {"const": 1},
+        "sequence_length": {"enum": [5, 6]}, "allow_leading_zero": {"const": false},
+        "allow_duplicates": {"const": true}, "max_symbol_repetition": {"const": 2},
+        "feedback_policy": {"const": "positional"},
+        "history_policy": {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "full"}}},
+        "match_deadline_seconds": {"enum": [180, 240]}, "attempt_limit": {"enum": [12, 15]}
+      }
     },
-    "match_deadline_seconds": {"enum": [180, 240]},
-    "attempt_limit": {"enum": [12, 15]}
-  }
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["preset_id", "game_type", "match_mode", "schema_version", "evaluator_version", "variant", "palette", "sequence_length", "allow_duplicates", "max_symbol_repetition", "feedback_policy", "history_policy", "match_deadline_seconds", "attempt_limit"],
+      "properties": {
+        "preset_id": {"enum": ["color_classic_5_v1", "color_permutation_8_v1"]},
+        "game_type": {"const": "color"}, "match_mode": {"enum": ["practice", "friendly"]},
+        "schema_version": {"const": 1}, "evaluator_version": {"const": 1},
+        "variant": {"enum": ["classic", "permutation"]},
+        "palette": {
+          "type": "array", "minItems": 8, "maxItems": 12,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["color_id", "hex", "label_key", "shape", "pattern"],
+            "properties": {
+              "color_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+              "hex": {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+              "label_key": {"type": "string", "minLength": 1},
+              "shape": {"type": "string", "minLength": 1},
+              "pattern": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "sequence_length": {"enum": [5, 8]}, "allow_duplicates": {"type": "boolean"},
+        "max_symbol_repetition": {"enum": [1, 2]},
+        "feedback_policy": {"enum": ["positional", "aggregate", "exact_count"]},
+        "history_policy": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "full"}}},
+            {"type": "object", "additionalProperties": false, "required": ["type", "count"], "properties": {"type": {"const": "last_n"}, "count": {"type": "integer", "minimum": 1}}},
+            {"type": "object", "additionalProperties": false, "required": ["type"], "properties": {"type": {"const": "none"}}}
+          ]
+        },
+        "match_deadline_seconds": {"enum": [180, 240]}, "attempt_limit": {"enum": [12, 15]}
+      },
+      "allOf": [
+        {"if": {"properties": {"variant": {"const": "classic"}}}, "then": {"properties": {"preset_id": {"const": "color_classic_5_v1"}, "sequence_length": {"const": 5}, "allow_duplicates": {"const": true}, "max_symbol_repetition": {"const": 2}, "feedback_policy": {"enum": ["positional", "aggregate"]}}}},
+        {"if": {"properties": {"variant": {"const": "permutation"}}}, "then": {"properties": {"preset_id": {"const": "color_permutation_8_v1"}, "sequence_length": {"const": 8}, "allow_duplicates": {"const": false}, "max_symbol_repetition": {"const": 1}, "feedback_policy": {"const": "exact_count"}}}}
+      ]
+    }
+  ]
 }

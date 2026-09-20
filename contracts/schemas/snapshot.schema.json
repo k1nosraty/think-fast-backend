@@ -7,16 +7,17 @@
   "required": [
     "contract_version", "match_id", "room_id", "state", "rules",
     "server_time", "started_at", "deadline", "viewer", "participants",
-    "own_attempts", "result", "latest_sequence", "available_actions"
+    "own_attempts", "challenge_setup", "result", "latest_sequence", "available_actions"
   ],
   "properties": {
     "contract_version": {"const": "v1.0.0-draft.1"},
     "match_id": {"type": "string", "format": "uuid"},
     "room_id": {"type": ["string", "null"], "format": "uuid"},
-    "state": {"enum": ["waiting", "ready_check", "countdown", "active", "finishing", "finished", "cancelled", "abandoned", "voided"]},
+    "state": {"enum": ["setup", "waiting", "ready_check", "countdown", "active", "finishing", "finished", "cancelled", "abandoned", "voided"]},
     "rules": {"$ref": "ruleset.schema.json"},
     "server_time": {"type": "string", "format": "date-time"},
     "started_at": {"type": ["string", "null"], "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
     "deadline": {"type": ["string", "null"], "format": "date-time"},
     "viewer": {
       "type": "object",
@@ -31,7 +32,7 @@
     "participants": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 2,
+      "maxItems": 8,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -42,7 +43,12 @@
           "avatar_id": {"type": "string", "minLength": 1},
           "connection_state": {"enum": ["connected", "disconnected", "abandoned"]},
           "attempt_count": {"type": "integer", "minimum": 0},
-          "solve_state": {"enum": ["playing", "solved", "unsolved", "abandoned"]}
+          "solve_state": {"enum": ["playing", "solved", "unsolved", "abandoned"]},
+          "solve_duration_seconds": {"type": ["integer", "null"], "minimum": 0},
+          "score": {"type": "integer", "minimum": 0},
+          "round_score": {"type": "integer", "minimum": 0},
+          "round_rank": {"type": ["integer", "null"], "minimum": 1},
+          "is_creator": {"type": "boolean"}
         }
       }
     },
@@ -55,12 +61,35 @@
         "properties": {
           "attempt_id": {"type": "string", "format": "uuid"},
           "ordinal": {"type": "integer", "minimum": 1},
-          "guess": {"type": "string", "pattern": "^[0-9]{5,6}$"},
+          "guess": {
+            "oneOf": [
+              {"type": "string"},
+              {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+            ]
+          },
           "feedback": {"$ref": "feedback.schema.json"},
           "accepted_at": {"type": "string", "format": "date-time"},
           "solved": {"type": "boolean"}
         }
       }
+    },
+    "challenge_setup": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expires_at", "own_challenge_committed", "committed_count", "required_count"],
+          "properties": {
+            "expires_at": {"type": "string", "format": "date-time"},
+            "own_challenge_committed": {"type": "boolean"},
+            "committed_count": {"type": "integer", "minimum": 0, "maximum": 8},
+            "required_count": {"type": "integer", "minimum": 1, "maximum": 8},
+            "is_creator": {"type": "boolean"},
+            "creator_participant_id": {"type": ["string", "null"], "format": "uuid"}
+          }
+        }
+      ]
     },
     "result": {
       "oneOf": [
@@ -72,9 +101,15 @@
           "properties": {
             "outcome": {"enum": ["won", "lost", "draw", "unsolved", "abandoned", "voided"]},
             "winner_participant_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}},
-            "reason": {"enum": ["solved", "deadline", "attempt_limit", "abandoned", "voided"]},
+            "reason": {"enum": ["solved", "deadline", "attempt_limit", "abandoned", "not_enough_players", "voided"]},
             "secret_revealed": {"type": "boolean"},
-            "revealed_secret": {"type": "string", "pattern": "^[0-9]{5,6}$"}
+            "winner_solve_duration_seconds": {"type": ["integer", "null"], "minimum": 0},
+            "revealed_secret": {
+              "oneOf": [
+                {"type": "string"},
+                {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+              ]
+            }
           }
         }
       ]
@@ -83,7 +118,15 @@
     "available_actions": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["start", "ready", "unready", "submit_guess", "leave", "request_rematch"]}
-    }
+      "items": {"enum": ["start", "ready", "unready", "commit_challenge", "submit_guess", "leave", "request_rematch", "next_round"]}
+    },
+    "round_number": {"type": "integer", "minimum": 1},
+    "total_rounds": {"type": "integer", "minimum": 1},
+    "creator_participant_id": {"type": ["string", "null"], "format": "uuid"},
+    "scores": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "round_state": {"enum": ["creator_setup", "countdown", "active", "round_finished", "match_finished"]}
   }
 }

@@ -1,0 +1,23 @@
+groups:
+  - name: think-fast-beta
+    rules:
+      - alert: ThinkFastTargetDown
+        expr: up{job="think-fast-backend"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Think Fast backend target is unavailable"}
+      - alert: ThinkFastOutboxBacklog
+        expr: think_fast_match_outbox_pending + think_fast_room_outbox_pending > 100
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Realtime outbox backlog exceeds 100 events"}
+      - alert: ThinkFastServerErrors
+        expr: increase(think_fast_server_errors_total[5m]) > 5
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Backend server errors exceed beta threshold"}
+      - alert: ThinkFastOutboxDeliveryFailures
+        expr: increase(think_fast_outbox_delivery_failures_total[5m]) > 10
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Realtime delivery failures are elevated"}

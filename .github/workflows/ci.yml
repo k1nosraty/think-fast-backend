@@ -1,0 +1,73 @@
+name: backend-ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-drift:
+    name: Backend/Frontend contract drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Backend
+        uses: actions/checkout@v4
+        with:
+          path: backend
+      - name: Checkout pinned Frontend bundle
+        uses: actions/checkout@v4
+        with:
+          repository: miladmoham1400/think-fast-frontend
+          ref: develop
+          path: frontend
+      - name: Compare canonical contract artifacts
+        run: diff -qr backend/contracts frontend/contracts
+
+  quality:
+    name: Backend quality and contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Backend
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install locked dependencies
+        run: uv sync --locked --dev
+      - name: Run quality, contract and test gates
+        run: uv run python scripts/check.py
+
+  security:
+    name: Backend security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Backend
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install locked dependencies
+        run: uv sync --locked --dev
+      - name: Run deployment and dependency security gates
+        run: uv run python scripts/check_security.py

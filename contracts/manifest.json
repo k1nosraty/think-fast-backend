@@ -1,13 +1,91 @@
 {
   "contract_version": "v1.0.0-draft.1",
+  "source": {
+    "repository": "think-fast-backend",
+    "revision": "v1.0.0-draft.1-r3"
+  },
+  "bundle_sha256": "44d7b1b39f0deb94979e1ce652f19c966e2ebf47b2d9f1c6ac71265137f6e0c2",
   "openapi": "openapi.json",
   "fixtures": [
-    {"path": "fixtures/errors/repetition-limit-exceeded.json", "schema": "schemas/error.schema.json"},
-    {"path": "fixtures/events/opponent-guessed.json", "schema": "schemas/event.schema.json"},
-    {"path": "fixtures/events/guess-evaluated.json", "schema": "schemas/event.schema.json"},
-    {"path": "fixtures/snapshots/solo-active.json", "schema": "schemas/snapshot.schema.json"},
-    {"path": "fixtures/snapshots/friendly-active.json", "schema": "schemas/snapshot.schema.json"},
-    {"path": "fixtures/requests/submit-guess.json", "schema": "schemas/guess-command.schema.json"},
-    {"path": "fixtures/number-feedback-cases.json", "schema": "schemas/number-feedback-cases.schema.json"}
+    {
+      "path": "fixtures/errors/repetition-limit-exceeded.json",
+      "schema": "schemas/error.schema.json"
+    },
+    {
+      "path": "fixtures/events/opponent-guessed.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/events/guess-evaluated.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/events/room-ready-changed.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/events/rematch-accepted.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/events/color-permutation-evaluated.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/events/challenge-setup-progress.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/events/party-round-finished.json",
+      "schema": "schemas/event.schema.json"
+    },
+    {
+      "path": "fixtures/snapshots/solo-active.json",
+      "schema": "schemas/snapshot.schema.json"
+    },
+    {
+      "path": "fixtures/snapshots/friendly-active.json",
+      "schema": "schemas/snapshot.schema.json"
+    },
+    {
+      "path": "fixtures/snapshots/friendly-finished.json",
+      "schema": "schemas/snapshot.schema.json"
+    },
+    {
+      "path": "fixtures/snapshots/player-challenge-setup.json",
+      "schema": "schemas/snapshot.schema.json"
+    },
+    {
+      "path": "fixtures/snapshots/party-active.json",
+      "schema": "schemas/snapshot.schema.json"
+    },
+    {
+      "path": "fixtures/requests/create-party-room.json",
+      "schema": "schemas/create-room-command.schema.json"
+    },
+    {
+      "path": "fixtures/requests/submit-guess.json",
+      "schema": "schemas/guess-command.schema.json"
+    },
+    {
+      "path": "fixtures/requests/submit-color-guess.json",
+      "schema": "schemas/guess-command.schema.json"
+    },
+    {
+      "path": "fixtures/requests/commit-challenge.json",
+      "schema": "schemas/challenge-command.schema.json"
+    },
+    {
+      "path": "fixtures/rules/color-classic-5.json",
+      "schema": "schemas/ruleset.schema.json"
+    },
+    {
+      "path": "fixtures/rules/color-permutation-8.json",
+      "schema": "schemas/ruleset.schema.json"
+    },
+    {
+      "path": "fixtures/number-feedback-cases.json",
+      "schema": "schemas/number-feedback-cases.schema.json"
+    }
   ]
 }

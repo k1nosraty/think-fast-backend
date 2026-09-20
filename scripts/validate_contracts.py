@@ -8,6 +8,7 @@ dependency-free makes the frozen examples immediately verifiable.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -16,9 +17,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
+# Keep in sync with apps/__init__.py CONTRACT_VERSION
+CONTRACT_VERSION = "v1.0.0-draft.1"
+CONTRACT_REVISION = "v1.0.0-draft.1-r3"
+CANONICAL_REPOSITORY = "think-fast-backend"
 
 
 class ContractValidationError(ValueError):
@@ -30,6 +34,33 @@ def load_json(path: Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ContractValidationError(f"cannot load {path.relative_to(ROOT)}: {exc}") from exc
+
+
+def _canonical_bytes(path: Path) -> bytes:
+    """Read a canonical artifact with LF line endings on every platform.
+
+    The digest must identify the artifact *content*, not the host platform's
+    line-ending convention. Without this, a Windows checkout (CRLF working tree
+    under ``core.autocrlf=true``) and a Linux CI runner compute different
+    digests for the same commit.
+    """
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
+def bundle_sha256(contracts: Path | None = None) -> str:
+    """Hash every canonical JSON artifact except the self-referential manifest."""
+    contracts = CONTRACTS if contracts is None else contracts
+    digest = hashlib.sha256()
+    paths = sorted(
+        path for path in contracts.rglob("*.json") if path != contracts / "manifest.json"
+    )
+    for path in paths:
+        relative = path.relative_to(contracts).as_posix().encode()
+        digest.update(relative)
+        digest.update(b"\0")
+        digest.update(_canonical_bytes(path))
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _pointer(document: Any, fragment: str) -> Any:
@@ -132,7 +163,9 @@ def validate(
     if expected_types is not None:
         names = [expected_types] if isinstance(expected_types, str) else expected_types
         if not any(_matches_type(instance, name) for name in names):
-            raise ContractValidationError(f"{where}: expected type {names}, got {type(instance).__name__}")
+            raise ContractValidationError(
+                f"{where}: expected type {names}, got {type(instance).__name__}"
+            )
 
     if isinstance(instance, str):
         if len(instance) < schema.get("minLength", 0):
@@ -176,7 +209,9 @@ def validate(
             elif schema.get("additionalProperties") is False:
                 raise ContractValidationError(f"{child_where}: additional property is forbidden")
             elif isinstance(schema.get("additionalProperties"), dict):
-                validate(value, schema["additionalProperties"], schema_path, root_schema, child_where)
+                validate(
+                    value, schema["additionalProperties"], schema_path, root_schema, child_where
+                )
 
 
 def _walk_refs(value: Any, path: Path, root: Any) -> None:
@@ -195,24 +230,45 @@ def validate_openapi(path: Path) -> None:
     document = load_json(path)
     if document.get("openapi") != "3.1.0":
         raise ContractValidationError("openapi.json: expected OpenAPI 3.1.0")
-    if document.get("info", {}).get("version") != "v1.0.0-draft.1":
+    if document.get("info", {}).get("version") != CONTRACT_VERSION:
         raise ContractValidationError("openapi.json: contract version mismatch")
-    required_paths = {
-        "/guest-sessions/", "/game-definitions/", "/solo-matches/", "/rooms/",
-        "/rooms/{room_id}/join/", "/rooms/{room_id}/ready/",
-        "/rooms/{room_id}/start/", "/matches/{match_id}/guesses/",
-        "/matches/{match_id}/snapshot/", "/matches/{match_id}/leave/",
+    implemented_paths = {
+        "/guest-sessions/",
+        "/guest-sessions/revoke/",
+        "/guest-sessions/ws-ticket/",
+        "/game-definitions/",
+        "/solo-matches/",
+        "/rooms/",
+        "/rooms/by-code/{join_code}/",
+        "/rooms/{room_id}/",
+        "/rooms/{room_id}/join/",
+        "/rooms/{room_id}/kick/",
+        "/rooms/{room_id}/leave/",
+        "/rooms/{room_id}/ready/",
+        "/rooms/{room_id}/rules/",
+        "/rooms/{room_id}/start/",
+        "/matches/{match_id}/guesses/",
+        "/matches/{match_id}/challenges/",
+        "/matches/{match_id}/snapshot/",
+        "/matches/{match_id}/leave/",
+        "/matches/{match_id}/next-round/",
         "/matches/{match_id}/rematch/",
     }
-    missing = required_paths - set(document.get("paths", {}))
-    if missing:
-        raise ContractValidationError(f"openapi.json: missing paths {sorted(missing)}")
+    published_paths = set(document.get("paths", {}))
+    if published_paths != implemented_paths:
+        missing = sorted(implemented_paths - published_paths)
+        unexpected = sorted(published_paths - implemented_paths)
+        raise ContractValidationError(
+            f"openapi.json: path inventory mismatch; missing={missing}, unexpected={unexpected}"
+        )
     operation_ids: list[str] = []
     for path_item in document["paths"].values():
         for method, operation in path_item.items():
             if method in {"get", "post", "put", "patch", "delete"}:
                 if "operationId" not in operation or "responses" not in operation:
-                    raise ContractValidationError("openapi.json: operation lacks operationId/responses")
+                    raise ContractValidationError(
+                        "openapi.json: operation lacks operationId/responses"
+                    )
                 operation_ids.append(operation["operationId"])
     if len(operation_ids) != len(set(operation_ids)):
         raise ContractValidationError("openapi.json: duplicate operationId")
@@ -235,12 +291,38 @@ def _assert_no_private_keys(value: Any, where: str) -> None:
 def validate_contracts() -> int:
     manifest_path = CONTRACTS / "manifest.json"
     manifest = load_json(manifest_path)
-    if manifest.get("contract_version") != "v1.0.0-draft.1":
+    if manifest.get("contract_version") != CONTRACT_VERSION:
         raise ContractValidationError("manifest: unexpected contract version")
+    expected_source = {
+        "repository": CANONICAL_REPOSITORY,
+        "revision": CONTRACT_REVISION,
+    }
+    if manifest.get("source") != expected_source:
+        raise ContractValidationError(f"manifest: expected source {expected_source}")
+    actual_digest = bundle_sha256()
+    if manifest.get("bundle_sha256") != actual_digest:
+        raise ContractValidationError(
+            "manifest: bundle_sha256 does not match canonical JSON artifacts; "
+            f"expected {actual_digest}"
+        )
     validate_openapi(CONTRACTS / manifest["openapi"])
 
+    entries = manifest.get("fixtures", [])
+    registered = [entry.get("path") for entry in entries]
+    if len(registered) != len(set(registered)):
+        raise ContractValidationError("manifest: duplicate fixture registration")
+    discovered = {
+        path.relative_to(CONTRACTS).as_posix() for path in (CONTRACTS / "fixtures").rglob("*.json")
+    }
+    if set(registered) != discovered:
+        raise ContractValidationError(
+            "manifest: fixture registry mismatch; "
+            f"missing={sorted(discovered - set(registered))}, "
+            f"unexpected={sorted(set(registered) - discovered)}"
+        )
+
     count = 0
-    for entry in manifest.get("fixtures", []):
+    for entry in entries:
         fixture_path = CONTRACTS / entry["path"]
         schema_path = CONTRACTS / entry["schema"]
         fixture = load_json(fixture_path)

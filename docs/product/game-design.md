@@ -78,6 +78,9 @@ waiting -> ready_check -> countdown -> active -> finishing -> finished
 - Friendly disconnect has a working-default 30-second grace period, subject to
   playtest in T4.
 - Room survives a completed match so participants can request a new Match.
+- A rematch request expires after 60 seconds. The opponent accepts by requesting
+  the same source Match, or explicitly declines. Acceptance creates entirely
+  fresh Match state while keeping the Room and its members.
 
 ### History policy
 
@@ -197,6 +200,8 @@ theme values are presentation metadata.
 - configurable palette size and sequence length;
 - duplicate-safe exact/present/absent evaluation;
 - feedback may be positional or aggregate as an explicit policy.
+- Official `color_classic_5_v1` uses 12 published colors, length 5, maximum
+  repetition 2, aggregate feedback, full history, 180 seconds and 12 Attempts.
 
 ### Color Permutation
 
@@ -204,6 +209,8 @@ theme values are presentation metadata.
 - every Guess must be a permutation of exactly that set;
 - feedback returns only `exact_count` and never correct positions;
 - default history is `last_n(1)`; `none` is a harder preset.
+- Official `color_permutation_8_v1` uses the first 8 published palette entries,
+  240 seconds and 15 Attempts.
 
 "Hidden/Mystery Palette" is later. Do not call it "Blind" because that conflicts
 with accessibility terminology.
@@ -223,11 +230,44 @@ both solve simultaneously after countdown
 ```
 
 - A committed Secret is immutable and private from its solver.
-- Setup timeout cancels without win/loss.
+- Room creation explicitly selects `challenge_source=players`; the default
+  remains `system`. This option is Friendly 1v1 only.
+- Setup lasts 120 seconds. Commit validates against the frozen RuleSet; the
+  second Commit starts the shared countdown atomically.
+- Setup timeout or participant leave cancels without Result, win, or loss.
 - Creator sees only the same public progress allowed to an opponent.
 - Results are Friendly-only and never rating-eligible because challenge
   difficulty differs.
 - The Domain models separate Challenges; it must not assume one `Match.secret`.
+
+## Party Mode (1 Creator → Multiple Guessers)
+
+Party Mode simplifies multiplayer group play for 3–8 players into a fast, social, high-energy party loop:
+
+```text
+             CREATOR (Rotates each round)
+                │
+                ▼
+           SECRET CODE (Authoritative server challenge)
+                │
+       ┌────────┼────────┐
+       ▼        ▼        ▼
+    PLAYER A  PLAYER B  PLAYER C ... (Up to 8 players)
+       │        │        │
+     Guess    Guess    Guess
+   (Private) (Private)(Private)
+```
+
+- **Core Topology:** One player is chosen as the Creator each round; all other players independently solve against the shared challenge.
+- **Creator Secret Input:** The Creator manually builds the secret within a quick setup window.
+- **Simultaneous Guessing:** All guessers submit guesses concurrently and receive immediate private positional feedback.
+- **Zero Leak Guarantee:** Guessers never see other players' guesses or feedback; the server broadcasts only public solve notifications (`participant.solved`).
+- **Short Authoritative Timer:** Default 60-second round countdown enforced strictly by the backend.
+- **Party Scoring System:**
+  - *Guessers:* Points rewarded based on solve speed and placement: 1st solver (+100), 2nd solver (+75), 3rd solver (+50), remaining solvers (+25).
+  - *Creator:* Points rewarded based on secret difficulty: +80 bonus if completely unsolved by all guessers, plus +20 points per unsolved guesser.
+- **Creator Rotation & Multi-Round Matches:** Matches run for 3, 5, or 7 rounds. The Creator role rotates fairly in round-robin order after each round. Disconnected players are gracefully bypassed.
+- **End-of-Round Social Reveal & Rematch:** At round end, the secret is revealed, round points and cumulative leaderboards are displayed, and after the final round a podium (🥇, 🥈, 🥉) with 1-click Rematch is presented.
 
 ## Word gate
 
@@ -242,6 +282,9 @@ T7 must prototype and decide:
 - latency, false-accept, and false-reject thresholds.
 
 AI moderation may assist later but cannot be the authoritative core validator.
+T7's measured outcome is documented in
+[the Word feasibility spike](word-feasibility-spike.md): production support is
+NO-GO until its licensed-data, quality and moderation gates pass.
 
 ## Accessibility and localization
 

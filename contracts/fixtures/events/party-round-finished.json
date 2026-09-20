@@ -1,0 +1,43 @@
+{
+  "type": "round.finished",
+  "version": 1,
+  "match_id": "54fd9228-bb06-418a-bc77-a08f806c3666",
+  "sequence": 19,
+  "occurred_at": "2026-09-18T10:03:00Z",
+  "visibility": "match",
+  "payload": {
+    "round_number": 2,
+    "total_rounds": 5,
+    "reason": "solved",
+    "solvers": [
+      {
+        "participant_id": "16170fa3-f6ea-4fdf-8851-d3c9d2ad6666",
+        "display_name": "Mina",
+        "rank": 1,
+        "round_score": 100,
+        "total_score": 175,
+        "solve_duration_ms": 42000
+      },
+      {
+        "participant_id": "f807e9db-5896-464f-803c-16b4627a6666",
+        "display_name": "Navid",
+        "rank": 2,
+        "round_score": 75,
+        "total_score": 75,
+        "solve_duration_ms": 51000
+      }
+    ],
+    "creator": {
+      "participant_id": "a191b028-2672-420b-af19-67c922e86666",
+      "display_name": "Sara",
+      "round_score": 30,
+      "total_score": 80
+    },
+    "revealed_secret": "58321",
+    "scores": {
+      "a191b028-2672-420b-af19-67c922e86666": 80,
+      "16170fa3-f6ea-4fdf-8851-d3c9d2ad6666": 175,
+      "f807e9db-5896-464f-803c-16b4627a6666": 75
+    }
+  }
+}

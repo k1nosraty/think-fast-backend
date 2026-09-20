@@ -1,0 +1,17 @@
+{
+  "preset_id": "color_permutation_8_v1", "game_type": "color", "match_mode": "practice",
+  "schema_version": 1, "evaluator_version": 1, "variant": "permutation",
+  "palette": [
+    {"color_id":"red","hex":"#D64545","label_key":"color.red","shape":"circle","pattern":"solid"},
+    {"color_id":"orange","hex":"#E67E22","label_key":"color.orange","shape":"triangle","pattern":"dots"},
+    {"color_id":"yellow","hex":"#F1C40F","label_key":"color.yellow","shape":"diamond","pattern":"stripes"},
+    {"color_id":"green","hex":"#27AE60","label_key":"color.green","shape":"square","pattern":"crosshatch"},
+    {"color_id":"cyan","hex":"#16A6B6","label_key":"color.cyan","shape":"hexagon","pattern":"waves"},
+    {"color_id":"blue","hex":"#2E6BD1","label_key":"color.blue","shape":"star","pattern":"grid"},
+    {"color_id":"indigo","hex":"#4B4FAE","label_key":"color.indigo","shape":"pentagon","pattern":"diagonal"},
+    {"color_id":"violet","hex":"#8E44AD","label_key":"color.violet","shape":"heart","pattern":"rings"}
+  ],
+  "sequence_length": 8, "allow_duplicates": false, "max_symbol_repetition": 1,
+  "feedback_policy": "exact_count", "history_policy": {"type":"last_n","count":1},
+  "match_deadline_seconds": 240, "attempt_limit": 15
+}

@@ -1,0 +1,12 @@
+{
+  "type": "room.ready_changed",
+  "version": 1,
+  "room_id": "32abbc5e-a156-44a1-b88f-8e2f4905934e",
+  "sequence": 2,
+  "occurred_at": "2026-08-24T08:28:00Z",
+  "visibility": "room",
+  "payload": {
+    "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+    "ready": true
+  }
+}

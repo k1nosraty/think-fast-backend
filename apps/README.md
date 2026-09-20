@@ -1,6 +1,6 @@
 # Application Boundaries
 
-Planned Django applications:
+Current Django applications:
 
 | Application | Owns | Must not own |
 | --- | --- | --- |
@@ -8,7 +8,10 @@ Planned Django applications:
 | `games` | mode definitions, rule configs, pure evaluators, secret generation | matchmaking, WebSockets |
 | `matches` | rooms, participants, rounds, attempts, scoring, lifecycle | evaluator internals, transport |
 | `realtime` | WebSocket consumers, event serialization, reconnect delivery | authoritative game decisions |
-| `progression` | history projections, statistics, achievements (post-MVP) | core match writes |
+| `analytics` | allowlisted playtest analytics, retention audit and resilient throttling | raw secrets, guesses or match decisions |
+
+`progression`, competition, social and moderation remain later boundaries and
+must not be scaffolded without an approved roadmap task.
 
 Each application should contain a local README when scaffolded. Cross-app work
 is coordinated through explicit application services and stable domain values,
@@ -24,3 +27,6 @@ transport (HTTP/WebSocket) -> application services -> domain rules
 ```
 
 The `games` rule layer must be importable and testable without Django setup.
+
+Run application tests from the Backend root with `uv run pytest apps/`. Put
+cross-application, protocol and concurrency tests under root `tests/`.

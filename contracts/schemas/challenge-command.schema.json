@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/challenge-command.schema.json",
+  "title": "CommitChallengeCommand",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command_id", "secret"],
+  "properties": {
+    "command_id": {"type": "string", "format": "uuid"},
+    "secret": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[0-9]{5,6}$"},
+        {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+      ]
+    }
+  }
+}

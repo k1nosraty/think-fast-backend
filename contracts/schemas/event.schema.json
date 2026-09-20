@@ -4,19 +4,25 @@
   "title": "RealtimeEvent",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "version", "match_id", "sequence", "occurred_at", "visibility", "payload"],
+  "required": ["type", "version", "sequence", "occurred_at", "visibility", "payload"],
+  "anyOf": [{"required": ["match_id"]}, {"required": ["room_id"]}],
   "properties": {
     "type": {
       "enum": [
-        "room.player_joined", "room.player_left", "room.ready_changed",
-        "match.countdown_started", "match.started", "guess.evaluated",
+        "room.player_joined", "room.player_left", "room.ready_changed", "room.rules_changed",
+        "challenge.setup_started", "challenge.committed", "challenge.setup_progress",
+        "challenge.setup_cancelled", "match.countdown_started", "match.started", "guess.evaluated",
         "opponent.guessed", "participant.solved", "participant.disconnected",
-        "participant.reconnected", "match.finished", "rematch.requested",
+        "participant.reconnected", "round.created", "round.started", "round.finished",
+        "creator.selected", "creator.rotated", "scores.updated",
+        "match.finished", "rematch.requested",
+        "rematch.accepted", "rematch.declined", "rematch.expired",
         "system.resync_required"
       ]
     },
     "version": {"const": 1},
     "match_id": {"type": "string", "format": "uuid"},
+    "room_id": {"type": "string", "format": "uuid"},
     "sequence": {"type": "integer", "minimum": 1},
     "occurred_at": {"type": "string", "format": "date-time"},
     "visibility": {"enum": ["room", "match", "participant", "connection"]},
@@ -34,7 +40,8 @@
             "required": ["participant_id", "attempt_count"],
             "properties": {
               "participant_id": {"type": "string", "format": "uuid"},
-              "attempt_count": {"type": "integer", "minimum": 1}
+              "attempt_count": {"type": "integer", "minimum": 1},
+              "round_number": {"type": "integer", "minimum": 1}
             }
           }
         }
@@ -54,7 +61,177 @@
               "attempt_id": {"type": "string", "format": "uuid"},
               "ordinal": {"type": "integer", "minimum": 1},
               "feedback": {"$ref": "feedback.schema.json"},
-              "solved": {"type": "boolean"}
+              "solved": {"type": "boolean"},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "participant.solved"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["participant_id", "attempt_count"],
+            "properties": {
+              "participant_id": {"type": "string", "format": "uuid"},
+              "attempt_count": {"type": "integer", "minimum": 1},
+              "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "solve_duration_ms": {"type": "integer", "minimum": 0},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "creator.selected"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["creator_participant_id", "creator_display_name", "round_number"],
+            "properties": {
+              "creator_participant_id": {"type": "string", "format": "uuid"},
+              "creator_display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "creator.rotated"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["new_creator_participant_id", "new_creator_display_name", "round_number"],
+            "properties": {
+              "new_creator_participant_id": {"type": "string", "format": "uuid"},
+              "new_creator_display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "round.created"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["round_number", "total_rounds", "creator_participant_id", "creator_display_name", "expires_at"],
+            "properties": {
+              "round_number": {"type": "integer", "minimum": 1},
+              "total_rounds": {"type": "integer", "minimum": 1},
+              "creator_participant_id": {"type": "string", "format": "uuid"},
+              "creator_display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "expires_at": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "round.started"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["round_number", "started_at", "deadline"],
+            "properties": {
+              "round_number": {"type": "integer", "minimum": 1},
+              "started_at": {"type": "string", "format": "date-time"},
+              "deadline": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "scores.updated"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scores", "round_number"],
+            "properties": {
+              "scores": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "round.finished"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["round_number", "total_rounds", "reason", "solvers", "creator", "revealed_secret", "scores"],
+            "properties": {
+              "round_number": {"type": "integer", "minimum": 1},
+              "total_rounds": {"type": "integer", "minimum": 1},
+              "reason": {"enum": ["solved", "deadline", "abandoned"]},
+              "solvers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["participant_id", "display_name", "rank", "round_score", "total_score", "solve_duration_ms"],
+                  "properties": {
+                    "participant_id": {"type": "string", "format": "uuid"},
+                    "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+                    "rank": {"type": "integer", "minimum": 1},
+                    "round_score": {"type": "integer", "minimum": 0},
+                    "total_score": {"type": "integer", "minimum": 0},
+                    "solve_duration_ms": {"type": "integer", "minimum": 0}
+                  }
+                }
+              },
+              "creator": {
+                "oneOf": [
+                  {"type": "null"},
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["participant_id", "display_name", "round_score", "total_score"],
+                    "properties": {
+                      "participant_id": {"type": "string", "format": "uuid"},
+                      "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+                      "round_score": {"type": "integer", "minimum": 0},
+                      "total_score": {"type": "integer", "minimum": 0}
+                    }
+                  }
+                ]
+              },
+              "revealed_secret": {
+                "oneOf": [
+                  {"type": "null"},
+                  {"type": "string"},
+                  {"type": "array", "minItems": 1, "items": {"type": "string"}}
+                ]
+              },
+              "scores": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
             }
           }
         }

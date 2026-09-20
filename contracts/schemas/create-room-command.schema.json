@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://think-fast.local/contracts/v1/create-room-command.schema.json",
+  "title": "CreateRoomCommand",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command_id", "preset_id"],
+  "properties": {
+    "command_id": {"type": "string", "format": "uuid"},
+    "preset_id": {
+      "enum": [
+        "number_classic_5_v1",
+        "number_brain_burner_6_v1",
+        "color_classic_5_v1",
+        "color_permutation_8_v1"
+      ]
+    },
+    "challenge_source": {"enum": ["system", "players"], "default": "system"},
+    "room_mode": {"enum": ["duel", "party"], "default": "duel"},
+    "rounds_count": {"type": "integer", "minimum": 1, "maximum": 15, "default": 5}
+  }
+}

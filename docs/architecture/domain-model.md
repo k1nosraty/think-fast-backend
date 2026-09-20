@@ -33,6 +33,10 @@ Player-authored duels create one Challenge per solver while a shared race uses
 one Challenge for every participant. `Challenge` prevents a false assumption
 that every Match has one global Secret.
 
+System Challenges have no creator/solver assignment. Player-authored Challenges
+have distinct creator and solver participants, are unique per `(Match, solver)`,
+and become immutable at Commit. A Match stays in `setup` until both exist.
+
 ### Attempt
 
 Immutable accepted Guess with participant, Challenge, normalized sequence, ordinal,

@@ -1,0 +1,58 @@
+{
+  "contract_version": "v1.0.0-draft.1",
+  "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+  "room_id": "32abbc5e-a156-44a1-b88f-8e2f4905934e",
+  "state": "finished",
+  "rules": {
+    "preset_id": "number_classic_5_v1",
+    "game_type": "number",
+    "match_mode": "friendly",
+    "schema_version": 1,
+    "evaluator_version": 1,
+    "sequence_length": 5,
+    "allow_leading_zero": false,
+    "allow_duplicates": true,
+    "max_symbol_repetition": 2,
+    "feedback_policy": "positional",
+    "history_policy": {"type": "full"},
+    "match_deadline_seconds": 180,
+    "attempt_limit": 12
+  },
+  "server_time": "2026-08-24T09:00:00Z",
+  "started_at": "2026-08-24T08:55:00Z",
+  "deadline": "2026-08-24T09:00:00Z",
+  "viewer": {
+    "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+    "display_name": "Amir",
+    "role": "host"
+  },
+  "participants": [
+    {
+      "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+      "display_name": "Amir",
+      "avatar_id": "avatar_01",
+      "connection_state": "connected",
+      "attempt_count": 5,
+      "solve_state": "unsolved"
+    },
+    {
+      "participant_id": "e1099ae9-2cf9-4f35-a5f8-76f9b6a18888",
+      "display_name": "Keyvan",
+      "avatar_id": "avatar_02",
+      "connection_state": "connected",
+      "attempt_count": 6,
+      "solve_state": "unsolved"
+    }
+  ],
+  "own_attempts": [],
+  "challenge_setup": null,
+  "result": {
+    "outcome": "draw",
+    "winner_participant_ids": [],
+    "reason": "deadline",
+    "secret_revealed": true,
+    "revealed_secret": "48321"
+  },
+  "latest_sequence": 22,
+  "available_actions": ["request_rematch", "leave"]
+}

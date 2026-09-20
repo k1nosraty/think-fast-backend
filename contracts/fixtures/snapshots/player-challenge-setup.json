@@ -1,0 +1,57 @@
+{
+  "contract_version": "v1.0.0-draft.1",
+  "match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+  "room_id": "32abbc5e-a156-44a1-b88f-8e2f4905934e",
+  "state": "setup",
+  "rules": {
+    "preset_id": "number_classic_5_v1",
+    "game_type": "number",
+    "match_mode": "friendly",
+    "schema_version": 1,
+    "evaluator_version": 1,
+    "sequence_length": 5,
+    "allow_leading_zero": false,
+    "allow_duplicates": true,
+    "max_symbol_repetition": 2,
+    "feedback_policy": "positional",
+    "history_policy": {"type": "full"},
+    "match_deadline_seconds": 180,
+    "attempt_limit": 12
+  },
+  "server_time": "2026-08-26T12:30:00Z",
+  "started_at": "2026-08-26T12:32:03Z",
+  "deadline": "2026-08-26T12:35:03Z",
+  "viewer": {
+    "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+    "display_name": "Amir",
+    "role": "host"
+  },
+  "participants": [
+    {
+      "participant_id": "85828209-75c5-426f-8d6f-f42af238b3da",
+      "display_name": "Amir",
+      "avatar_id": "avatar_01",
+      "connection_state": "connected",
+      "attempt_count": 0,
+      "solve_state": "playing"
+    },
+    {
+      "participant_id": "e1099ae9-2cf9-4f35-a5f8-76f9b6a18888",
+      "display_name": "Keyvan",
+      "avatar_id": "avatar_02",
+      "connection_state": "connected",
+      "attempt_count": 0,
+      "solve_state": "playing"
+    }
+  ],
+  "own_attempts": [],
+  "challenge_setup": {
+    "expires_at": "2026-08-26T12:32:00Z",
+    "own_challenge_committed": true,
+    "committed_count": 1,
+    "required_count": 2
+  },
+  "result": null,
+  "latest_sequence": 3,
+  "available_actions": ["leave"]
+}

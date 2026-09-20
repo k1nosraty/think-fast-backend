@@ -1,0 +1,108 @@
+import uuid
+from datetime import datetime, timedelta
+
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
+
+from apps.analytics.service import record_analytics
+from apps.matches.models import Match, Participant
+from apps.matches.party import abandon_party_participant, is_party_match
+from apps.matches.services import finalize_friendly_abandon
+from apps.realtime.publisher import record_event
+
+
+@transaction.atomic
+def claim_connection(
+    *, participant_id: uuid.UUID, connection_id: uuid.UUID, channel_name: str
+) -> str:
+    participant = (
+        Participant.objects.select_for_update().select_related("match").get(pk=participant_id)
+    )
+    replaced_channel = participant.primary_channel_name if participant.connected else ""
+    was_connected = participant.connected
+    participant.connected = True
+    participant.primary_connection_id = connection_id
+    participant.primary_channel_name = channel_name
+    participant.disconnected_at = None
+    participant.grace_expires_at = None
+    participant.save(
+        update_fields=[
+            "connected",
+            "primary_connection_id",
+            "primary_channel_name",
+            "disconnected_at",
+            "grace_expires_at",
+        ]
+    )
+    if not was_connected:
+        record_event(
+            match=participant.match,
+            event_type="participant.reconnected",
+            visibility="match",
+            participant=participant,
+            payload={"participant_id": str(participant.id)},
+        )
+        record_analytics(
+            "participant_reconnected",
+            match_id=participant.match_id,
+            room_id=participant.match.room_id,
+            preset_id=str(participant.match.rules["preset_id"]),
+        )
+    return replaced_channel
+
+
+@transaction.atomic
+def release_connection(
+    *, participant_id: uuid.UUID, connection_id: uuid.UUID, now: datetime | None = None
+) -> float | None:
+    now = now or timezone.now()
+    participant = (
+        Participant.objects.select_for_update().select_related("match").get(pk=participant_id)
+    )
+    if participant.primary_connection_id != connection_id:
+        return None
+    participant.connected = False
+    participant.disconnected_at = now
+    participant.grace_expires_at = now + timedelta(
+        seconds=settings.FRIENDLY_DISCONNECT_GRACE_SECONDS
+    )
+    participant.primary_channel_name = ""
+    participant.save(
+        update_fields=["connected", "disconnected_at", "grace_expires_at", "primary_channel_name"]
+    )
+    record_event(
+        match=participant.match,
+        event_type="participant.disconnected",
+        visibility="match",
+        participant=participant,
+        payload={
+            "participant_id": str(participant.id),
+            "grace_expires_at": participant.grace_expires_at.isoformat().replace("+00:00", "Z"),
+        },
+    )
+    return float(settings.FRIENDLY_DISCONNECT_GRACE_SECONDS)
+
+
+@transaction.atomic
+def expire_disconnect_grace(
+    *, participant_id: uuid.UUID, connection_id: uuid.UUID, now: datetime | None = None
+) -> bool:
+    now = now or timezone.now()
+    participant = (
+        Participant.objects.select_for_update().select_related("match").get(pk=participant_id)
+    )
+    if participant.connected or participant.primary_connection_id != connection_id:
+        return False
+    if participant.grace_expires_at is None or now < participant.grace_expires_at:
+        return False
+    match = Match.objects.select_for_update().get(pk=participant.match_id)
+    if participant.solve_state != Participant.SolveState.PLAYING:
+        return False
+    if is_party_match(match):
+        abandon_party_participant(match, participant, now=now)
+        return True
+    if match.state not in {Match.State.ACTIVE, Match.State.FINISHING}:
+        return False
+    finalize_friendly_abandon(match, participant, now=now)
+    return True

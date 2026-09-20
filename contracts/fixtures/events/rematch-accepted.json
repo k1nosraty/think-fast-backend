@@ -1,0 +1,12 @@
+{
+  "type": "rematch.accepted",
+  "version": 1,
+  "room_id": "32abbc5e-a156-44a1-b88f-8e2f4905934e",
+  "sequence": 7,
+  "occurred_at": "2026-08-24T10:00:00Z",
+  "visibility": "room",
+  "payload": {
+    "source_match_id": "1d4a1b27-795b-4ddf-9c9b-b47ebf11b648",
+    "new_match_id": "d5436762-8dab-4afd-9e4c-d23c63bef655"
+  }
+}

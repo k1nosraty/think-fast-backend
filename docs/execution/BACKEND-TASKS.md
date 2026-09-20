@@ -2,6 +2,9 @@
 
 This is the canonical Django work plan. Give an AI agent exactly one task with
 the current repository. The separate React repository has its own task plan.
+The cross-repository status source is the workspace [`TASKS.md`](../../../TASKS.md);
+the historical “next task” sentences below describe sequencing at the time and
+must not override its current active task (TF-07 after TF-06).
 
 ## Prompt prefix for every task
 
@@ -36,6 +39,9 @@ example validates; no endpoint, model, evaluator, or consumer implemented.
 
 **Effort:** High.
 
+**Status:** Complete on 2026-08-24. The next implementation task is T2; do not
+reinterpret or expand this foundation implicitly.
+
 - Verify and pin supported Python/Django/DRF/Channels/PostgreSQL/Redis versions.
 - Replace scaffold dependencies with the selected `pyproject.toml`/lock flow.
 - Configure Ruff, mypy, pytest, coverage, pre-commit and CI.
@@ -51,6 +57,9 @@ format/lint/types/Django/migrations/tests/contracts pass; no gameplay exists.
 ## T2 — Solo Number vertical slice
 
 **Effort:** Very high.
+
+**Status:** Complete on 2026-08-24. Solo Number is the only implemented gameplay
+flow. The next task is T3; do not add room/realtime behavior implicitly.
 
 - Implement immutable validated RuleSet snapshot with schema/evaluator version.
 - Implement secure injectable Secret generator and pure duplicate-safe evaluator.
@@ -69,6 +78,9 @@ Secret never leaks before authorized reveal; all gates pass.
 
 **Effort:** Very high.
 
+**Status:** Complete on 2026-08-24. Private Friendly 1v1 is implemented; the
+next task is T4 reliability/recovery and must not be folded back into T3.
+
 - Implement Room separate from Match: join code, host/transfer, capacity,
   membership, Ready reset, start permission, participant freeze, late-join deny.
 - Create one shared Challenge with independent participant Attempts.
@@ -85,6 +97,10 @@ crosses participants; schemas/fixtures stay current.
 ## T4 — Reliability and recovery
 
 **Effort:** Very high.
+
+**Status:** Complete on 2026-08-24. Durable outbox delivery, gameplay connection
+replacement, grace/abandonment, ordered resync and restart convergence are
+implemented. The next task is T5; do not add rematch/analytics implicitly.
 
 - Audit every mutation for database constraint, atomic transition/locking,
   idempotency lifetime/conflict and post-commit publication.
@@ -104,6 +120,10 @@ survive restart; reliability suites pass repeatedly.
 
 **Effort:** High.
 
+**Status:** Complete on 2026-08-24. Rematch request/accept/decline/expiry,
+fresh-Match isolation, privacy-safe analytics and playtest seed/export tools are
+implemented. The next task is T6; do not add Color behavior implicitly.
+
 - Implement rematch request/accept/decline/expiry inside the existing Room; each
   rematch creates a new immutable Match/RuleSet/Secret.
 - Add privacy-safe aggregate analytics ports/events for start, completion,
@@ -120,6 +140,11 @@ remain auditable.
 
 **Effort:** High.
 
+**Status:** Complete on 2026-08-26. Versioned palettes/presets, both pure Color
+evaluators, the explicit game registry, JSON Guess storage and Solo/Friendly
+flows are implemented. The next task is T7; do not add player-authored or Word
+behavior implicitly.
+
 - Freeze and publish Color palette metadata, validation, feedback tagged unions,
   presets and canonical fixtures before implementation.
 - Implement pure Color validators/evaluators and explicit registry entry.
@@ -135,6 +160,11 @@ green; no duplicated lifecycle/realtime or large game-type conditional chain.
 ## T7 — Player-authored friendly challenges and Word spike
 
 **Effort:** Very high, two ordered gates.
+
+**Status:** Complete on 2026-08-26. Symmetric per-solver Challenge setup,
+immutable encrypted Commit, timeout cancellation, viewer-authorized recovery
+and reveal are implemented. The bounded Word prototype recommends NO-GO for
+production until licensed dataset and measured quality gates pass. Next is T8.
 
 Part A:
 
@@ -159,6 +189,20 @@ are explicit and evidence-backed.
 
 **Effort:** Very high.
 
+**Status:** Engineering scope complete; single-host validation baseline
+complete for every gate a single process can prove (updated 2026-09-05).
+Security, retention, observability, kill switches, audit, backup/restore,
+smoke, image scanning and failure/recovery harnesses all have recorded local
+PASS evidence. The three load/throughput gates (`guess_sustained`,
+`guess_burst`, `reconnect_1000`) FAIL on a single ASGI process by design and
+are deferred to the multi-replica staging topology; a connection-exhaustion
+defect found while re-validating them was fixed with a bounded psycopg pool —
+see ADR 0013 and `docs/operations/README.md`. Production Beta deployment is not
+yet approved: repeat the applicable gates on the agreed production-like staging
+topology and attach infrastructure measurements. T9 planning is now allowed,
+but this status does not waive the deployment gate or authorize competitive
+implementation before its plan is accepted.
+
 - Finalize security config, HTTPS/WSS, origin/host policy, throttles, admin least
   privilege, scanning, retention/deletion and audit.
 - Add safe logs/traces/request IDs, metrics/dashboards/alerts, error reporting,
@@ -175,7 +219,28 @@ feature kill switches are validated.
 
 ## T9 — Competitive planning gate, not one implementation task
 
-After beta evidence, design Ranked fixed RuleSets, matchmaking, rating,
+After the T8 engineering baseline, design Ranked fixed RuleSets, matchmaking, rating,
 leaderboard/seasons, anti-farming/multi-account/disconnect abuse, report/block,
 progression separation and capacity. Split the accepted plan into new bounded
 vertical tasks. Do not ask one AI agent to implement all competitive features.
+
+## T10 — Party Mode Core Gameplay Redesign
+
+**Status:** `Implemented · Unit-tested · E2E-verified` (2026-09-18)
+
+**Bounded outcome:** Party Mode supports a 1 Creator → Multiple Guessers room
+with 3–8 participants, authoritative 60-second rounds, placement scoring,
+creator rotation, rematch and recovery-safe command handling. This task does
+not change the two-player Friendly rules and does not authorize Ranked work.
+
+**Acceptance evidence:**
+
+- Party/realtime tests: `uv run pytest apps/matches/tests/test_party.py tests/realtime/ --no-cov -q` — 16 passed.
+- Backend quality/security: `uv run python scripts/check.py` — 226 passed;
+  `uv run python scripts/check_security.py` — passed.
+- Contract validators pass at revision `v1.0.0-draft.1-r2` with 20 fixtures.
+- Live browser capacity flow: `npx playwright test e2e/party.spec.ts` — 1
+  passed, covering the 2-player creator setup and 8-player room capacity.
+
+`Staging-verified` and `Production-approved` remain unset; see the operations
+evidence register and the workspace tracker for those separate release gates.

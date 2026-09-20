@@ -3,11 +3,14 @@
 This document explains protocol principles, resources, events, errors, and
 recovery. T0 is complete: the canonical machine-readable source is
 `contracts/openapi.json`, its JSON Schemas, manifest, and fixtures at
-`v1.0.0-draft.1`.
+`v1.0.0-draft.1`. The current compatible bundle revision is
+`v1.0.0-draft.1-r3`; `contracts/manifest.json` records that revision, every
+canonical fixture, and the deterministic SHA-256 of all other JSON artifacts.
 
 ## Global rules
 
-- HTTP base: `/api/v1/`; WebSocket: `/ws/v1/matches/{match_id}/`.
+- HTTP base: `/api/v1/`; WebSockets: `/ws/v1/rooms/{room_id}/` for lobby
+  updates and `/ws/v1/matches/{match_id}/` for gameplay.
 - Public IDs are UUIDs; timestamps are ISO-8601 UTC.
 - Client sends intent, not authoritative state, rules, time, score, or attempt
   number.
@@ -25,17 +28,58 @@ POST /api/v1/guest-sessions/
 GET  /api/v1/game-definitions/
 POST /api/v1/solo-matches/
 POST /api/v1/rooms/
+GET  /api/v1/rooms/by-code/{join_code}/
+GET  /api/v1/rooms/{room_id}/
 POST /api/v1/rooms/{room_id}/join/
+POST /api/v1/rooms/{room_id}/kick/
+POST /api/v1/rooms/{room_id}/leave/
 POST /api/v1/rooms/{room_id}/ready/
+POST /api/v1/rooms/{room_id}/rules/
 POST /api/v1/rooms/{room_id}/start/
+POST /api/v1/matches/{match_id}/challenges/
 POST /api/v1/matches/{match_id}/guesses/
 POST /api/v1/matches/{match_id}/leave/
+POST /api/v1/matches/{match_id}/next-round/
 POST /api/v1/matches/{match_id}/rematch/
 GET  /api/v1/matches/{match_id}/snapshot/
 ```
 
-Compatible detail may be added during implementation. A rename, removal, or
-semantic change requires explicit contract versioning and coordinated review.
+The Account verification/session endpoints previously present only in the
+Frontend copy are not part of this revision because no Backend route implements
+them. Adding them requires a separate approved contract and implementation.
+
+Compatible additions increment the bundle revision (`-rN`) while keeping the
+contract version. A rename, removal, newly required field, narrowed accepted
+value, or semantic change requires a new incompatible contract version and
+coordinated client/server review. Every revision regenerates the manifest
+checksum and is copied from Backend to consumers; generated copies are never
+edited by hand.
+
+## Party contract
+
+`POST /rooms/` accepts `room_mode: party` and `rounds_count` from 1 through 15;
+omitting them preserves the `duel` and 5-round defaults. A Duel room holds
+exactly two members. A Party room holds three to eight members: one Creator plus
+at least two Guessers, which is the minimum for placement scoring (1st/2nd/3rd)
+to be meaningful. `Room.minimum_members()`/`Room.maximum_members()` are the
+authoritative capacity policy; the start, join and rematch paths all read it
+rather than re-deriving the numbers. Room snapshots expose both fields.
+
+A Party match snapshot uses the common Snapshot schema plus `round_number`,
+`total_rounds`, `creator_participant_id`, per-participant `score`, `round_score`,
+`round_rank` and `is_creator`, the `scores` map, and `round_state`. Only the
+current creator may commit the round challenge; non-creators may submit guesses.
+After `round.finished`, `next_round` appears in `available_actions` while another
+round remains. `POST /matches/{match_id}/next-round/` accepts the common
+`command_id` body, advances to the next round or returns the terminal match
+snapshot, and is retry-safe for the same participant and command identity. A
+Party Match that can no longer field the minimum number of active players is
+terminated with `Result.reason = not_enough_players`.
+
+Party events use the common ordered envelope. The canonical
+`party-round-finished.json` fixture freezes the public round summary, revealed
+round secret and score map; participant-private `guess.evaluated` and public
+`opponent.guessed` may additionally carry `round_number`.
 
 ## Command outcome
 
@@ -82,6 +126,12 @@ Permutation feedback:
 Clients must switch on `kind`; fields from one variant are not silently reused
 for another.
 
+Number Guess remains a fixed-width digit string. Color Guess is an ordered JSON
+array of stable `color_id` values. Color Classic uses positional or aggregate
+feedback according to its frozen RuleSet; Color Permutation exposes only
+`exact_count`. Palette definitions in the RuleSet include hex, localization
+key, shape and pattern, and clients must not communicate meaning by color alone.
+
 ## Event envelope
 
 ```json
@@ -104,20 +154,49 @@ Candidate event types:
 | --- | --- | --- |
 | `room.player_joined` | room public | lobby membership |
 | `room.ready_changed` | room public | readiness |
+| `challenge.setup_started` | match public | setup expiry and required count |
+| `challenge.committed` | creator private | idempotent Commit acknowledgement |
+| `challenge.setup_progress` | match public | count-only setup progress |
+| `challenge.setup_cancelled` | match public | timeout/leave cancellation, no Result |
 | `match.countdown_started` | match public | synchronized start |
 | `match.started` | match public | authoritative active state/deadline |
 | `guess.evaluated` | participant private | accepted Attempt and Feedback |
 | `opponent.guessed` | opponent public | pressure/progress without Guess |
-| `participant.solved` | match public | solve status, not private history |
+| `participant.solved` | match public | solve status, not private history; carries `participant_id` and `attempt_count`, plus `display_name`, `solve_duration_ms` and `round_number` in Party |
 | `participant.disconnected` | match public | presence |
 | `participant.reconnected` | match public | presence |
+| `creator.selected` | match public | first-round Creator announcement |
+| `creator.rotated` | match public | Creator hand-over for a new round or after a Creator leaves |
+| `round.created` | match public | new Party round identity, Creator and setup expiry |
+| `round.started` | match public | authoritative round start and deadline |
+| `round.finished` | match public | public round summary: ranked solvers, Creator score, revealed secret and score map |
+| `scores.updated` | match public | per-participant total score map for the round |
 | `match.finished` | viewer-specific | result and authorized reveal |
-| `rematch.requested` | room public | rematch readiness |
+| `rematch.requested` | room public | pending proposal and expiry |
+| `rematch.accepted` | room public | new Match identity |
+| `rematch.declined` | room public | explicit decline/cancel |
+| `rematch.expired` | room public | proposal timeout |
 | `system.resync_required` | connection private | fetch snapshot after a gap |
 
 Persisted match sequence is monotonic. Delivery may be duplicated or delayed;
 clients ignore an already-applied sequence and fetch Snapshot on an unexplained
 gap. Event delivery is not the source of truth.
+
+For a recoverable gap, an authorized client may first send:
+
+```json
+{"type": "resync", "last_sequence": 17}
+```
+
+The server replays all viewer-authorized stored events after sequence 17 in
+order. A duplicate is ignored client-side. An invalid cursor returns
+`system.resync_required`; a missing/pruned history in a future retention policy
+must do the same, and the client then fetches Snapshot. Reconnect never pauses
+the persisted deadline.
+
+Room events use `room_id` and a monotonic sequence scoped to the Room. Match
+events use `match_id` and a monotonic sequence scoped to the Match. They never
+share one sequence space.
 
 ## Snapshot contract
 
@@ -136,6 +215,26 @@ An authorized snapshot contains:
 It must never contain another player's Guess/Feedback or an unrevealed Secret.
 Initial load, page refresh, reconnect, and event-gap recovery all use Snapshot.
 
+## Rematch contract
+
+`POST /matches/{match_id}/rematch/` accepts a command ID and optional
+`action: request|decline` (`request` by default). The first request opens a
+60-second proposal; the other participant's request accepts it. The Room
+snapshot exposes `latest_match_id` plus proposal state, requester, expiry and
+the new Match ID. Clients then subscribe to/fetch the new Match normally.
+
+## Player-authored Challenge contract
+
+A Room may opt into `challenge_source: players` (default `system`). Starting it
+creates a Friendly-only Match in `setup`. Each participant calls
+`POST /matches/{match_id}/challenges/` once with `command_id` and a RuleSet-shaped
+`secret`; the server validates, encrypts and assigns it to the other solver.
+Snapshot exposes only expiry, own Commit status and aggregate Commit count.
+Neither Secret, target solver nor opponent-private acknowledgement is public.
+The second Commit schedules countdown. Setup expiry/leave produces `cancelled`
+with `result: null` and no rating eligibility. Normal finish reveals only the
+Challenge assigned to the current viewer.
+
 ## Error envelope
 
 ```json
@@ -151,11 +250,16 @@ Initial load, page refresh, reconnect, and event-gap recovery all use Snapshot.
 Initial stable codes include:
 
 ```text
+authentication_required
+permission_denied
+match_not_found
+invalid_request
 invalid_guess_length
 invalid_symbol
 leading_zero_not_allowed
 duplicate_not_allowed
 repetition_limit_exceeded
+invalid_permutation
 match_not_active
 deadline_elapsed
 attempt_limit_reached
@@ -164,6 +268,12 @@ room_full
 not_room_host
 not_ready
 idempotency_conflict
+challenge_setup_closed
+challenge_setup_expired
+challenge_already_committed
+challenge_not_committed
+feature_disabled
+internal_error
 rate_limited
 resync_required
 client_version_unsupported
@@ -179,8 +289,11 @@ message text.
 - HTTP and WebSocket authenticate the same identity and enforce match membership.
 - Room codes locate rooms but are not authorization after join.
 - WebSocket subscription is denied before group membership when unauthorized.
-- One primary gameplay connection per participant/match is the working default;
-  T0 freezes replacement behavior.
+- One primary gameplay connection exists per participant/match. A newer socket
+  atomically replaces and closes the older socket. Disconnect starts the
+  configured 30-second grace while the match timer continues; reconnect clears
+  it, and expiry durably abandons the participant/match without revealing the
+  secret.
 
 ## Contract workflow
 

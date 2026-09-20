@@ -18,7 +18,7 @@ through a recorded, versioned decision and compatible contract/preset update.
 | Friendly challenge | Same server-generated Secret for both players |
 | Room capacity | Exactly two active players in Social MVP |
 | History | Full accepted Guess history visible to its owner |
-| Later | Color, player-authored Challenge, Word, Ranked, team/tournament |
+| Expansion | Color in T6; player-authored Friendly Challenge in T7; Word remains gated after T7 spike |
 
 ## Number presets
 
@@ -55,6 +55,20 @@ experiment, not an official MVP preset.
 Canonical duplicate examples live in
 `contracts/fixtures/number-feedback-cases.json` and are part of the contract.
 
+## T6 Color presets
+
+| Field | Color Classic 5 | Color Permutation 8 |
+| --- | --- | --- |
+| Preset ID | `color_classic_5_v1` | `color_permutation_8_v1` |
+| Palette/length | 12 / 5 | fixed 8 / 8 |
+| Duplicates | Yes, maximum 2 | No; exact permutation |
+| Feedback | aggregate exact/present | exact count only |
+| History | full | last 1 |
+| Deadline / Attempts | 180s / 12 | 240s / 15 |
+
+Color Guess and authorized reveal use arrays of stable `color_id`; every palette
+entry also publishes a label, shape and pattern for accessibility.
+
 ## Timing, result, and reveal
 
 | Decision | Accepted value |
@@ -66,6 +80,7 @@ Canonical duplicate examples live in
 | Multiplayer disconnect | Timer continues |
 | Friendly reconnect grace | 30 seconds |
 | Connection replacement | New authenticated connection becomes primary |
+| Rematch proposal | 60 seconds; opponent request accepts; explicit decline |
 | Reveal on normal solved/unsolved finish | Yes, to participants |
 | Reveal on abandoned/voided/cancelled | No by default |
 
@@ -92,6 +107,9 @@ These values are versioned preset/competition policy, not hardcoded UI behavior.
 | Protected Secret | Delete or cryptographically make inaccessible within 24 hours after terminal Match, unless a documented security incident hold applies |
 | Operational logs | 30 days, secret/private-Guess redacted |
 | Aggregate analytics | May persist without raw Secret or private Guess |
+
+T5 narrows aggregate analytics further: Guess, Feedback, Secret, token, guest
+identity and arbitrary payload fields are prohibited by the analytics port.
 
 Production legal/privacy review in T8 may shorten these periods. It must not
 silently lengthen sensitive-data retention.

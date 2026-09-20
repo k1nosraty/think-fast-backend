@@ -8,16 +8,10 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 
 | Task | Milestone | Playable outcome |
 | --- | --- | --- |
-| T0 | Decision and contract freeze | **Complete** — MVP rules and v1 draft contract frozen |
-| T1 | Engineering foundation | Reproducible local/CI backend foundation |
-| T2 | Solo Number vertical slice | Guest completes a Number match end-to-end |
-| T3 | Private room and realtime 1v1 | Two guests play a shared-secret match |
-| T4 | Reliability and recovery | Retry, concurrency, timeout, refresh, and reconnect are safe |
-| T5 | Rematch and gameplay polish | Complete play-rematch loop ready for playtest |
-| T6 | Color expansion | Color Classic and Permutation use the shared match platform |
-| T7 | Challenge expansion | Player-authored duel plus a bounded Word feasibility spike |
-| T8 | Production beta | Secure, observable, load-tested staged release |
-| T9 | Competitive product | Ranked/matchmaking/progression only after MVP evidence |
+| T0–T7 | Foundation through Challenge | **Implemented · Unit-tested** — see the bounded task records and their evidence |
+| T8 | Production beta | **Implemented · Unit-tested** — single-host baseline passes; staging and production approval remain pending |
+| T9 | Competitive product | **Ready for planning** — split Ranked/matchmaking/progression into bounded tasks before implementation |
+| T10 | Party Mode Core Gameplay Redesign | **Implemented · Unit-tested · E2E-verified** — 1 Creator → Multiple Guessers (3–8), 60s timer, placement scoring, rotation and rematch |
 
 ## Release boundaries
 
@@ -45,13 +39,17 @@ implemented only if its validation/feedback spike passes explicit gates.
 ### Beta — T8
 
 Operations, security, retention, monitoring, backup/restore, and capacity are
-validated before external release.
+validated before external release. The single-host engineering baseline is
+complete; external release still requires evidence from the agreed
+production-like staging topology.
 
 ### Post-MVP — T9
 
 Ranked, rating, leaderboard, public matchmaking, achievements, party/team,
 spectators, tournaments, chat, cosmetics, and monetization require product data
-and separate execution plans.
+and separate execution plans. T9 planning may proceed from the accepted T8
+engineering baseline, but it does not waive the staging gate for Production
+Beta deployment.
 
 ## Phase exit rule
 
@@ -63,3 +61,8 @@ A task closes only when:
 - migrations and operational impact are documented;
 - the vertical outcome is demonstrated on the supported client path;
 - unresolved limitations are recorded rather than hidden.
+
+The cross-repository status source is the workspace [`TASKS.md`](../TASKS.md).
+After TF-06 (cross-repository CI), the next task is TF-07 (structured user
+playtest), with TF-08 (staging/release gate) after it; no Backend roadmap entry
+is `Staging-verified` or `Production-approved` yet.

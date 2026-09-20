@@ -10,29 +10,30 @@ the assigned AI task. Root and `apps/AGENTS.md` are binding.
 
 ## Target stack
 
-T1 must select and pin a supported Python/Django baseline. Planned components:
+T1 selected and locked this supported baseline:
 
-- Django + Django REST Framework
-- ASGI + Django Channels
-- PostgreSQL source of truth
-- Redis channel layer/ephemeral coordination
+- Python 3.12, Django 5.2 LTS and Django REST Framework 3.18
+- ASGI + Django Channels 4.3
+- PostgreSQL 17 source of truth
+- Redis 7.4 channel layer/ephemeral coordination
 - pytest/pytest-django, Ruff, mypy, coverage, pre-commit
 - OpenAPI plus versioned JSON event schemas
 
-Do not assume the scaffold's dependency versions are approved until T1 verifies
-them against official compatibility and records the choice.
+`pyproject.toml`, `uv.lock` and ADR 0005 are canonical for exact versions and
+upgrade policy.
 
 ## Module ownership
 
 | Module | Owns |
 | --- | --- |
 | accounts | guest/user identity, profile snapshot, account upgrade |
+| analytics | privacy-safe product analytics, event recording, resilient throttling |
 | games | game definitions, RuleSet validation, secure generation ports, pure evaluators |
 | matches | rooms, participants, challenges, attempts, lifecycle, result, use cases |
 | realtime | consumers, subscriptions, event/snapshot delivery adapters |
 
-Competition, progression, social, moderation, and analytics are added only by a
-roadmap task. A conceptual boundary does not require a premature Django app.
+Competition, progression, social, and moderation are added only by a roadmap
+task. A conceptual boundary does not require a premature Django app.
 
 ## Write path: submit Guess
 
@@ -65,8 +66,8 @@ not sufficient.
 
 - Serializers validate transport shape; use cases decide behavior.
 - Consumers deliver/authorize and never calculate game outcomes.
-- Publish only after commit, preferably through a transactional outbox once T4
-  reliability requires it.
+- Persist Room/Match events in the authoritative transaction and publish only
+  after commit through the durable retryable outbox.
 - Snapshot is viewer-specific recovery truth; events are incremental updates.
 - Public/private event projections are distinct types/functions, not a flag on a
   generic serializer.
@@ -86,3 +87,11 @@ not sufficient.
 For each task: migrations, tests, schemas/examples, admin/operational impact,
 security review proportional to the change, successful quality commands, and
 the root `AGENTS.md` handoff.
+
+## Local developer loop
+
+From the workspace root, prefer `./run-think-fast.sh`. From this repository,
+start dependencies with `docker compose up -d`, then run migrations and Daphne.
+If host port `5432` is occupied, export `POSTGRES_PORT=5433` for both Compose and
+every Django command. Run `uv run python scripts/check.py` before handoff and
+add `uv run python scripts/check_security.py` for security-sensitive work.
