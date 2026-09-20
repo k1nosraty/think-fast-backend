@@ -64,8 +64,8 @@ class GuestSessionWSTicketView(APIView):
 
     def post(self, request: Request) -> Response:
         guest: GuestIdentity = request.user  # type: ignore[assignment]
-        # Issue short-lived single-use ticket
-        ticket, token = WSTicket.issue(guest=guest, ttl_seconds=30)
+        # Issue short-lived single-use ticket, TTL configurable via WS_TICKET_TTL_SECONDS
+        ticket, token = WSTicket.issue(guest=guest)
         return Response(
             {
                 "ticket": token,
