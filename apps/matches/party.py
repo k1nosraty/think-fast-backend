@@ -35,6 +35,7 @@ DEFAULT_ROUND_DURATION_SECONDS = 60
 DEFAULT_SETUP_DURATION_SECONDS = 90
 PARTY_MINIMUM_ACTIVE_PLAYERS = 3
 
+
 # Configurable via settings, with fallbacks to defaults for backward compatibility
 def _party_setup_seconds() -> int:
     return int(getattr(settings, "PARTY_SETUP_DURATION_SECONDS", DEFAULT_SETUP_DURATION_SECONDS))

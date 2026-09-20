@@ -36,9 +36,7 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         raise GameAPIError("invalid_request", "Room rules are not available.", status_code=500)
     members = list(room.memberships.all())
     # Defensive: host membership may be missing; fallback to first member if available
-    host_membership = next(
-        (member for member in members if member.guest_id == room.host_id), None
-    )
+    host_membership = next((member for member in members if member.guest_id == room.host_id), None)
     if host_membership is None and members:
         host_membership = members[0]
     viewer_membership = (
@@ -61,9 +59,7 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         )
         rematch_payload = {
             "state": proposal.state,
-            "requester_participant_id": str(requester_member.id)
-            if requester_member
-            else None,
+            "requester_participant_id": str(requester_member.id) if requester_member else None,
             "expires_at": proposal.expires_at.isoformat().replace("+00:00", "Z"),
             "new_match_id": str(proposal.new_match_id) if proposal.new_match_id else None,
         }
@@ -569,9 +565,10 @@ def update_room_rules(*, guest: GuestIdentity, room_id: uuid.UUID, preset_id: st
         raise GameAPIError("invalid_request", "Unknown preset_id.", status_code=400)
     room.preset_id = preset_id
     RoomMembership.objects.filter(room=room).update(ready=False)
+    minimum_players = 2 if room.room_mode == "duel" else 3
     room.state = (
         Room.State.READY_CHECK
-        if RoomMembership.objects.filter(room=room).count() >= 2
+        if RoomMembership.objects.filter(room=room).count() >= minimum_players
         else Room.State.WAITING
     )
     room.save(update_fields=["preset_id", "state", "updated_at"])

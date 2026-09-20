@@ -24,7 +24,8 @@ class Command(BaseCommand):
         limit = max(1, int(options["limit"]))
         interval = max(0.1, float(options["interval"]))
         self.stdout.write(
-            f"reliability worker starting interval={interval}s limit={limit} (SIGTERM for clean shutdown)"
+            f"reliability worker starting interval={interval}s limit={limit} "
+            "(SIGTERM for clean shutdown)"
         )
 
         # Flag for clean shutdown

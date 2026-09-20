@@ -15,6 +15,7 @@ from apps.matches.models import (
     Room,
     RoomMembership,
 )
+from apps.matches.rematches import rematch_command
 from apps.matches.rooms import (
     create_room,
     join_room,
@@ -26,7 +27,6 @@ from apps.matches.rooms import (
     start_room,
     update_room_rules,
 )
-from apps.matches.rematches import rematch_command
 
 
 def _guest(name: str = "Amir") -> GuestIdentity:
@@ -385,7 +385,7 @@ def test_room_snapshot_handles_missing_host_and_requester_left() -> None:
     with patch("apps.games.registry.generate_number_secret", return_value="12345"):
         match, _ = start_room(guest=host, room_id=room.id, command_id=_command())
     # Create rematch proposal from host
-    proposal = RematchProposal.objects.create(
+    RematchProposal.objects.create(
         room=room,
         source_match=match,
         requester=host,
@@ -470,7 +470,7 @@ def test_kick_member_is_idempotent_and_resets_all_ready_in_party() -> None:
     assert result.memberships.count() == 2
     # All remaining ready must be reset
     assert not RoomMembership.objects.filter(room=room, ready=True).exists()
-    # Party with 2 remaining < minimum 3 => WAITING (not blindly WAITING for all cases, but correct here)
+    # Party with 2 remaining < minimum 3 => WAITING (correctly derived)
     assert result.state == Room.State.WAITING
     # Replay same command_id must not repeat mutation and must be idempotent
     replay = kick_member(
@@ -610,7 +610,7 @@ def test_party_rematch_supports_3_to_8_players() -> None:
     )
     match.refresh_from_db()
     # First player requests rematch
-    room1, new_match1, created1 = rematch_command(
+    _room1, new_match1, created1 = rematch_command(
         guest=host, match_id=match.id, command_id=_command(), action="request"
     )
     assert created1 is True

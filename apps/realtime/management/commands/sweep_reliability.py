@@ -41,7 +41,8 @@ class Command(BaseCommand):
 
         # Continuous mode with clean shutdown
         self.stdout.write(
-            f"sweep_reliability looping interval={interval}s limit={limit} (SIGTERM for clean shutdown)"
+            f"sweep_reliability looping interval={interval}s limit={limit} "
+            "(SIGTERM for clean shutdown)"
         )
         shutdown_requested = False
 

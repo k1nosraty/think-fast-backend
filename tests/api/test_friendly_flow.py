@@ -185,7 +185,10 @@ def test_kick_requires_host_and_target_validation() -> None:
     assert forbidden.data["code"] == "not_room_host"
     self_kick = host.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"command_id": command()["command_id"], "target_participant_id": joined["members"][0]["participant_id"]},
+        {
+            "command_id": command()["command_id"],
+            "target_participant_id": joined["members"][0]["participant_id"],
+        },
         format="json",
     )
     assert self_kick.status_code == 400
@@ -206,7 +209,7 @@ def test_host_changes_room_rules_and_resets_ready() -> None:
     )
     assert response.status_code == 200
     assert response.data["preset_id"] == "number_brain_burner_6_v1"
-    assert response.data["state"] == "waiting"
+    assert response.data["state"] == "ready_check"
     assert all(member["ready"] is False for member in response.data["members"])
     forbidden = opponent.post(
         f"/api/v1/rooms/{room['room_id']}/rules/",

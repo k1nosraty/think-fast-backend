@@ -138,7 +138,7 @@ def test_room_websocket_delivers_join_and_ready_without_private_game_data() -> N
 @pytest.mark.django_db(transaction=True)
 def test_websocket_ticket_is_single_use_and_revoked_session_rejected() -> None:
     async def scenario() -> None:
-        host, opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
+        _host, opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
         match_id = started["match_id"]
 
         # Issue ticket
@@ -157,6 +157,9 @@ def test_websocket_ticket_is_single_use_and_revoked_session_rejected() -> None:
         )
         connected, _ = await ws1.connect()
         assert connected is True
+        # Drain initial events
+        await ws1.receive_json_from(timeout=1)
+        await ws1.receive_json_from(timeout=1)
         await ws1.disconnect()
         await asyncio.sleep(0.1)
 
@@ -203,7 +206,7 @@ def test_websocket_ticket_is_single_use_and_revoked_session_rejected() -> None:
 @pytest.mark.django_db(transaction=True)
 def test_revoke_closes_active_websocket_sessions() -> None:
     async def scenario() -> None:
-        host, opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
+        host, _opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
         match_id = started["match_id"]
         host_token = host._credentials["HTTP_AUTHORIZATION"].removeprefix("Bearer ")
 

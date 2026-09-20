@@ -57,10 +57,16 @@ class WSTicket(models.Model):
         return hashlib.sha256(token.encode()).hexdigest()
 
     @classmethod
-    def issue(cls, *, guest: GuestIdentity, ttl_seconds: int | None = None) -> tuple["WSTicket", str]:
+    def issue(
+        cls, *, guest: GuestIdentity, ttl_seconds: int | None = None
+    ) -> tuple["WSTicket", str]:
         token = secrets.token_urlsafe(32)
         now = timezone.now()
-        ttl = ttl_seconds if ttl_seconds is not None else int(getattr(settings, "WS_TICKET_TTL_SECONDS", 30))
+        ttl = (
+            ttl_seconds
+            if ttl_seconds is not None
+            else int(getattr(settings, "WS_TICKET_TTL_SECONDS", 30))
+        )
         ticket = cls.objects.create(
             guest=guest,
             token_digest=cls.digest_token(token),

@@ -32,9 +32,7 @@ def _guest_for_token(token: str) -> GuestIdentity | AnonymousUser:
     if not ticket.guest.is_active:
         return AnonymousUser()
     # Atomically mark used to prevent replay
-    updated = WSTicket.objects.filter(pk=ticket.pk, used_at__isnull=True).update(
-        used_at=now
-    )
+    updated = WSTicket.objects.filter(pk=ticket.pk, used_at__isnull=True).update(used_at=now)
     if updated == 0:
         # Already used concurrently
         return AnonymousUser()
@@ -56,9 +54,7 @@ class GuestTokenAuthMiddleware(BaseMiddleware):
                 for item in headers.get(b"sec-websocket-protocol", b"").decode().split(",")
             ]
             # Preferred: ticket.<token> short-lived single-use
-            ticket_proto = next(
-                (item for item in protocols if item.startswith("ticket.")), ""
-            )
+            ticket_proto = next((item for item in protocols if item.startswith("ticket.")), "")
             if ticket_proto:
                 token = ticket_proto.removeprefix("ticket.")
             # NOTE: We deliberately do NOT accept bearer.<token> in subprotocol

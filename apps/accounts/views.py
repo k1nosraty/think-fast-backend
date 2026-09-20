@@ -49,9 +49,7 @@ class GuestSessionRevokeView(APIView):
             channel_layer = get_channel_layer()
             if channel_layer is not None:
                 group_name = f"guest.{guest.id}"
-                async_to_sync(channel_layer.group_send)(
-                    group_name, {"type": "revoke.disconnect"}
-                )
+                async_to_sync(channel_layer.group_send)(group_name, {"type": "revoke.disconnect"})
         except Exception:  # pragma: no cover - best effort
             pass
 

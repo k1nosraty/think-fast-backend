@@ -303,9 +303,15 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
             # Preserve ordering (already ordered by sequence) and gap/duplicate semantics
             # Private-event filtering and authorization preserved in match_event logic
             for stored in batch_events:
-                if stored.visibility == "participant" and stored.participant_id != self.participant_id:
+                if (
+                    stored.visibility == "participant"
+                    and stored.participant_id != self.participant_id
+                ):
                     continue
-                if stored.event_type == "opponent.guessed" and stored.participant_id == self.participant_id:
+                if (
+                    stored.event_type == "opponent.guessed"
+                    and stored.participant_id == self.participant_id
+                ):
                     continue
                 await self.send_json(
                     {

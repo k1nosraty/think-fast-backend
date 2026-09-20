@@ -36,7 +36,8 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(
-            f"publish_outbox looping interval={interval}s limit={limit} (SIGTERM for clean shutdown)"
+            f"publish_outbox looping interval={interval}s limit={limit} "
+            "(SIGTERM for clean shutdown)"
         )
         shutdown_requested = False
 

@@ -27,7 +27,7 @@ def main() -> int:
     commands = [
         (
             [
-                "python",
+                sys.executable,
                 "manage.py",
                 "check",
                 "--deploy",
