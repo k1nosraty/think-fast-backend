@@ -17,10 +17,7 @@ services:
   reliability-worker:
     image: ${THINK_FAST_IMAGE:?Set immutable THINK_FAST_IMAGE digest}
     env_file: ${THINK_FAST_ENV_FILE:?Set THINK_FAST_ENV_FILE}
-    command:
-      - sh
-      - -c
-      - while true; do python manage.py sweep_reliability --limit 1000; sleep 1; done
+    command: ["python", "manage.py", "run_reliability_worker", "--limit", "1000", "--interval", "1"]
     init: true
     stop_grace_period: 30s
     restart: unless-stopped

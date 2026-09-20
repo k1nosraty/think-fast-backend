@@ -35,6 +35,14 @@ DEFAULT_ROUND_DURATION_SECONDS = 60
 DEFAULT_SETUP_DURATION_SECONDS = 90
 PARTY_MINIMUM_ACTIVE_PLAYERS = 3
 
+# Configurable via settings, with fallbacks to defaults for backward compatibility
+def _party_setup_seconds() -> int:
+    return int(getattr(settings, "PARTY_SETUP_DURATION_SECONDS", DEFAULT_SETUP_DURATION_SECONDS))
+
+
+def _party_round_seconds() -> int:
+    return int(getattr(settings, "PARTY_ROUND_DURATION_SECONDS", DEFAULT_ROUND_DURATION_SECONDS))
+
 
 def is_party_match(match: Match) -> bool:
     if match.room_id is None:
@@ -165,7 +173,7 @@ def commit_party_secret(
     )
 
     countdown_seconds = getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 5)
-    round_duration = getattr(rules, "match_deadline_seconds", DEFAULT_ROUND_DURATION_SECONDS)
+    round_duration = getattr(rules, "match_deadline_seconds", _party_round_seconds())
     started_at = current + timedelta(seconds=countdown_seconds)
     deadline = started_at + timedelta(seconds=round_duration)
 
@@ -404,7 +412,7 @@ def _reassign_current_round_creator(match: Match, now: datetime) -> Participant 
         return None
     previous = match.creator
     match.creator = successor
-    match.setup_expires_at = now + timedelta(seconds=DEFAULT_SETUP_DURATION_SECONDS)
+    match.setup_expires_at = now + timedelta(seconds=_party_setup_seconds())
     match.save(update_fields=["creator", "setup_expires_at"])
     if previous is not None:
         previous.is_creator = False
@@ -710,7 +718,7 @@ def advance_party_round(
     match.creator = next_creator
     match.state = Match.State.SETUP
     match.round_state = "creator_setup"
-    match.setup_expires_at = current + timedelta(seconds=DEFAULT_SETUP_DURATION_SECONDS)
+    match.setup_expires_at = current + timedelta(seconds=_party_setup_seconds())
     match.save(
         update_fields=["round_number", "creator", "state", "round_state", "setup_expires_at"]
     )

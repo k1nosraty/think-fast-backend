@@ -27,7 +27,7 @@ class ReadySerializer(CommandSerializer):
     ready = serializers.BooleanField()
 
 
-class KickMemberSerializer(serializers.Serializer[dict[str, object]]):
+class KickMemberSerializer(CommandSerializer):
     target_participant_id = serializers.UUIDField()
 
 

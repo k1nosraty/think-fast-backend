@@ -139,8 +139,15 @@ def rematch_command(
     elif proposal.state == RematchProposal.State.PENDING and proposal.requester_id != guest.id:
         require_match_creation()
         members = list(room.memberships.select_for_update())
-        if len(members) != 2:
-            raise GameAPIError("room_full", "Exactly two room members are required.")
+        # Option A: Extend rematch to support 2-8 players
+        # Duel requires exactly 2, Party supports 2-8 (task says 3-8, ADR says 2-8)
+        if room.room_mode == "duel":
+            if len(members) != 2:
+                raise GameAPIError("room_full", "Exactly two room members are required.")
+        else:
+            # Party mode: allow 2-8 players (task acceptance requires 3-8)
+            if len(members) < 2 or len(members) > 8:
+                raise GameAPIError("room_full", "Party rematch requires 2-8 room members.")
         new_match = _create_friendly_match(room=room, members=members)
         proposal.state = RematchProposal.State.ACCEPTED
         proposal.new_match = new_match

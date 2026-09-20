@@ -223,6 +223,8 @@ def validate_openapi(path: Path) -> None:
         raise ContractValidationError("openapi.json: contract version mismatch")
     implemented_paths = {
         "/guest-sessions/",
+        "/guest-sessions/revoke/",
+        "/guest-sessions/ws-ticket/",
         "/game-definitions/",
         "/solo-matches/",
         "/rooms/",

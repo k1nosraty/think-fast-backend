@@ -4,7 +4,7 @@
     "repository": "think-fast-backend",
     "revision": "v1.0.0-draft.1-r2"
   },
-  "bundle_sha256": "d42d1a42b302dfa65d1e890c0b1fd0ab5b43ae2a91950c27b1b627afde3b5477",
+  "bundle_sha256": "7972b32e9833d6f766ed424f6e7fa779cb0459fce429d22adaf902dd21cc751f",
   "openapi": "openapi.json",
   "fixtures": [
     {"path": "fixtures/errors/repetition-limit-exceeded.json", "schema": "schemas/error.schema.json"},

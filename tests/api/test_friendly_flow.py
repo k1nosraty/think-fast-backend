@@ -159,7 +159,7 @@ def test_host_kicks_member() -> None:
     target = joined["members"][1]["participant_id"]
     response = host.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"target_participant_id": target},
+        {"command_id": command()["command_id"], "target_participant_id": target},
         format="json",
     )
     assert response.status_code == 200
@@ -178,14 +178,14 @@ def test_kick_requires_host_and_target_validation() -> None:
     target = joined["members"][1]["participant_id"]
     forbidden = opponent.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"target_participant_id": target},
+        {"command_id": command()["command_id"], "target_participant_id": target},
         format="json",
     )
     assert forbidden.status_code == 403
     assert forbidden.data["code"] == "not_room_host"
     self_kick = host.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"target_participant_id": joined["members"][0]["participant_id"]},
+        {"command_id": command()["command_id"], "target_participant_id": joined["members"][0]["participant_id"]},
         format="json",
     )
     assert self_kick.status_code == 400
