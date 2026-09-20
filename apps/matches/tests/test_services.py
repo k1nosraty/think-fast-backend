@@ -130,7 +130,7 @@ def test_friendly_finish_on_deadline_during_submit() -> None:
 
 
 @pytest.mark.django_db
-def test_duel_finishes_immediately_when_first_player_solves() -> None:
+def test_duel_finishes_after_tie_window_when_first_player_solves() -> None:
     host, _, match = _friendly()
     solved_at = match.started_at + timedelta(seconds=1)
 
@@ -144,7 +144,12 @@ def test_duel_finishes_immediately_when_first_player_solves() -> None:
 
     assert created is True
     assert attempt is not None and attempt.solved is True
-    assert updated.state == Match.State.FINISHED
+    assert updated.state == Match.State.FINISHING
+
+    finished = refresh_match_state(
+        guest=host, match_id=match.id, now=solved_at + timedelta(milliseconds=501)
+    )
+    assert finished.state == Match.State.FINISHED
     result = Result.objects.get(match=match)
     assert result.reason == "solved"
     assert result.winner_participant_ids == [str(match.participants.get(guest=host).id)]
@@ -152,7 +157,9 @@ def test_duel_finishes_immediately_when_first_player_solves() -> None:
     assert snapshot(match, host)["finished_at"] is not None
     winner_id = str(match.participants.get(guest=host).id)
     winner_snapshot = next(
-        item for item in snapshot(match, host)["participants"] if item["participant_id"] == winner_id
+        item
+        for item in snapshot(match, host)["participants"]
+        if item["participant_id"] == winner_id
     )
     assert winner_snapshot["solve_duration_seconds"] == 1
 

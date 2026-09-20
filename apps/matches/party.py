@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
+from apps.analytics.service import record_analytics
 from apps.games.base import GameValidationError
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret, encrypt_secret
@@ -32,6 +33,30 @@ CREATOR_PER_UNSOLVED_BONUS = 20
 CREATOR_MINIMUM_POINTS = 20
 DEFAULT_ROUND_DURATION_SECONDS = 60
 DEFAULT_SETUP_DURATION_SECONDS = 90
+# A Party match needs one creator plus two guessers; below that the round can no
+# longer produce meaningful placement scoring.
+PARTY_MINIMUM_ACTIVE_PLAYERS = Room.minimum_members(Room.Mode.PARTY)
+
+
+# Configurable via settings, with fallbacks to defaults for backward compatibility
+def _party_setup_seconds() -> int:
+    return int(getattr(settings, "PARTY_SETUP_DURATION_SECONDS", DEFAULT_SETUP_DURATION_SECONDS))
+
+
+def _party_round_seconds() -> int:
+    return int(getattr(settings, "PARTY_ROUND_DURATION_SECONDS", DEFAULT_ROUND_DURATION_SECONDS))
+
+
+def is_party_match(match: Match) -> bool:
+    """True when the Match belongs to a Party Room.
+
+    This is the single place that decides Party vs Duel/Solo routing; callers
+    must not re-implement the `room_mode == "party"` check.
+    """
+    if match.room_id is None:
+        return False
+    room = match.room
+    return room is not None and room.room_mode == Room.Mode.PARTY
 
 
 def get_current_round_challenge(match: Match) -> Challenge | None:
@@ -157,7 +182,7 @@ def commit_party_secret(
     )
 
     countdown_seconds = getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 5)
-    round_duration = getattr(rules, "match_deadline_seconds", DEFAULT_ROUND_DURATION_SECONDS)
+    round_duration = _party_round_seconds()
     started_at = current + timedelta(seconds=countdown_seconds)
     deadline = started_at + timedelta(seconds=round_duration)
 
@@ -334,6 +359,144 @@ def finish_party_round(match: Match, *, reason: str, now: datetime | None = None
     return match
 
 
+def _party_active_players(match: Match) -> int:
+    return match.participants.exclude(solve_state=Participant.SolveState.ABANDONED).count()
+
+
+@transaction.atomic
+def _terminate_party_match(match: Match, *, reason: str, now: datetime) -> None:
+    """Terminate the whole party match with a terminal outcome, keeping the
+    secret unrevealed and releasing the room back to the ready check."""
+    match.state = Match.State.ABANDONED
+    match.round_state = "match_finished"
+    match.finished_at = now
+    match.finish_due_at = None
+    match.save(update_fields=["state", "round_state", "finished_at", "finish_due_at"])
+    active_ids = [
+        str(item.id)
+        for item in match.participants.exclude(solve_state=Participant.SolveState.ABANDONED)
+    ]
+    Result.objects.update_or_create(
+        match=match,
+        defaults={
+            "outcome": "abandoned",
+            "reason": reason,
+            "winner_participant_ids": active_ids,
+            "secret_revealed": False,
+        },
+    )
+    if match.room_id:
+        room = Room.objects.select_for_update().get(pk=match.room_id)
+        room.state = Room.State.READY_CHECK
+        room.save(update_fields=["state", "updated_at"])
+        RoomMembership.objects.filter(room=room).update(ready=False)
+    record_event(
+        match=match,
+        event_type="match.finished",
+        visibility="match",
+        payload={
+            "outcome": "abandoned",
+            "winner_participant_ids": active_ids,
+            "reason": reason,
+            "secret_revealed": False,
+        },
+    )
+    record_analytics(
+        "match_completed",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        outcome="abandoned",
+        reason=reason,
+        solve_duration_ms=max(0, int((now - match.started_at).total_seconds() * 1000)),
+    )
+
+
+@transaction.atomic
+def _reassign_current_round_creator(match: Match, now: datetime) -> Participant | None:
+    """Hand the current round's creator role to the next eligible player after
+    the departing creator and reset the setup window so the round can proceed."""
+    successor = pick_next_creator(match, exclude_participant=match.creator, now=now)
+    if successor is None:
+        return None
+    previous = match.creator
+    match.creator = successor
+    match.setup_expires_at = now + timedelta(seconds=_party_setup_seconds())
+    match.save(update_fields=["creator", "setup_expires_at"])
+    if previous is not None:
+        previous.is_creator = False
+        previous.save(update_fields=["is_creator"])
+    successor.is_creator = True
+    successor.save(update_fields=["is_creator"])
+    record_event(
+        match=match,
+        event_type="creator.rotated",
+        visibility="match",
+        payload={
+            "new_creator_participant_id": str(successor.id),
+            "new_creator_display_name": successor.display_name,
+            "round_number": match.round_number,
+        },
+    )
+    record_event(
+        match=match,
+        event_type="challenge.setup_started",
+        visibility="match",
+        payload={
+            "expires_at": match.setup_expires_at.isoformat().replace("+00:00", "Z"),
+            "creator_participant_id": str(successor.id),
+            "required_count": 1,
+        },
+    )
+    return successor
+
+
+@transaction.atomic
+def abandon_party_participant(match: Match, participant: Participant, *, now: datetime) -> None:
+    """Absorb a party participant who leaves or loses the disconnect grace.
+
+    - A single departure never abandons the whole match while enough players
+      remain (``PARTY_MINIMUM_ACTIVE_PLAYERS``).
+    - The creator leaving during creator setup is replaced by the next eligible
+      player and the setup window resets; the architect never strands the round.
+    - The creator leaving after the secret is committed leaves the committed
+      round to run to its normal finish.
+    - The last PLAYING guesser leaving finishes the round.
+    """
+    if participant.solve_state != Participant.SolveState.PLAYING:
+        return
+    participant.solve_state = Participant.SolveState.ABANDONED
+    participant.save(update_fields=["solve_state"])
+    record_analytics(
+        "participant_abandoned",
+        match_id=match.id,
+        room_id=match.room_id,
+        preset_id=str(match.rules["preset_id"]),
+        reason="abandoned",
+    )
+    if _party_active_players(match) < PARTY_MINIMUM_ACTIVE_PLAYERS:
+        _terminate_party_match(match, reason=Result.Reason.NOT_ENOUGH_PLAYERS, now=now)
+        return
+    if match.round_state == "creator_setup":
+        if match.creator_id == participant.id:
+            _reassign_current_round_creator(match, now=now)
+        return
+    if match.state in {
+        Match.State.COUNTDOWN,
+        Match.State.ACTIVE,
+        Match.State.FINISHING,
+    }:
+        if match.creator_id == participant.id:
+            return
+        remaining_guessers = Participant.objects.filter(
+            match=match, solve_state=Participant.SolveState.PLAYING
+        )
+        if match.creator_id is not None:
+            remaining_guessers = remaining_guessers.exclude(pk=match.creator_id)
+        if not remaining_guessers.exists():
+            finish_party_round(match, reason="abandoned", now=now)
+
+
 @transaction.atomic
 def submit_party_guess(
     *,
@@ -457,7 +620,7 @@ def submit_party_guess(
     if solved:
         record_event(
             match=match,
-            event_type="player.solved",
+            event_type="participant.solved",
             visibility="match",
             payload={
                 "participant_id": str(participant.id),
@@ -564,7 +727,7 @@ def advance_party_round(
     match.creator = next_creator
     match.state = Match.State.SETUP
     match.round_state = "creator_setup"
-    match.setup_expires_at = current + timedelta(seconds=DEFAULT_SETUP_DURATION_SECONDS)
+    match.setup_expires_at = current + timedelta(seconds=_party_setup_seconds())
     match.save(
         update_fields=["round_number", "creator", "state", "round_state", "setup_expires_at"]
     )

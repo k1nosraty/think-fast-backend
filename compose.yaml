@@ -28,5 +28,29 @@ services:
       timeout: 3s
       retries: 10
 
+  reliability-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.local}
+      POSTGRES_DB: ${POSTGRES_DB:-think_fast}
+      POSTGRES_USER: ${POSTGRES_USER:-think_fast}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-think_fast_local}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      GAME_SECRET_ENCRYPTION_KEY: ${GAME_SECRET_ENCRYPTION_KEY:-MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=}
+      RELIABILITY_WORKER_INTERVAL_SECONDS: ${RELIABILITY_WORKER_INTERVAL_SECONDS:-1}
+    command: ["python", "manage.py", "run_reliability_worker", "--limit", "100", "--interval", "${RELIABILITY_WORKER_INTERVAL_SECONDS:-1}"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
 volumes:
   postgres-data:

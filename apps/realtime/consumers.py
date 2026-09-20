@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 from collections.abc import Callable, Coroutine
 from typing import Any, cast
@@ -16,9 +17,9 @@ from apps.realtime.publisher import match_group, room_group
 from config.observability import websocket_connected, websocket_disconnected
 
 
-def database_sync_to_async[T](
-    func: Callable[..., T],
-) -> Callable[..., Coroutine[Any, Any, T]]:
+def database_sync_to_async(
+    func: Callable[..., Any],
+) -> Callable[..., Coroutine[Any, Any, Any]]:
     """Run a DB operation off the single thread-sensitive executor.
 
     Channels' default ``database_sync_to_async`` is thread-sensitive: every call
@@ -37,7 +38,7 @@ def database_sync_to_async[T](
     """
 
     return cast(
-        "Callable[..., Coroutine[Any, Any, T]]",
+        "Callable[..., Coroutine[Any, Any, Any]]",
         DatabaseSyncToAsync(func, thread_sensitive=False),
     )
 
@@ -65,6 +66,7 @@ def _initial_event_ids(match_id: uuid.UUID) -> list[str]:
                 "challenge.setup_cancelled",
                 "match.countdown_started",
                 "match.started",
+                "round.started",
             ],
         ).values_list("id", flat=True)
     ]
@@ -74,10 +76,34 @@ def _initial_event_ids(match_id: uuid.UUID) -> list[str]:
 def _event_ids_after(match_id: uuid.UUID, sequence: int) -> list[str]:
     return [
         str(item)
-        for item in MatchEvent.objects.filter(match_id=match_id, sequence__gt=sequence).values_list(
-            "id", flat=True
-        )
+        for item in MatchEvent.objects.filter(match_id=match_id, sequence__gt=sequence)
+        .order_by("sequence")
+        .values_list("id", flat=True)
     ]
+
+
+@database_sync_to_async
+def _event_ids_after_limited(match_id: uuid.UUID, sequence: int, limit: int) -> list[str]:
+    """Fetch up to limit+1 ids ordered by sequence to detect overflow."""
+    return [
+        str(item)
+        for item in MatchEvent.objects.filter(match_id=match_id, sequence__gt=sequence)
+        .order_by("sequence")
+        .values_list("id", flat=True)[: limit + 1]
+    ]
+
+
+@database_sync_to_async
+def _events_by_ids(event_ids: list[str]) -> list[MatchEvent]:
+    """Batched fetch of MatchEvents by ids, ordered by sequence."""
+    if not event_ids:
+        return []
+    # Preserve ordering by sequence, not input order, to guarantee ordered replay
+    return list(
+        MatchEvent.objects.filter(id__in=event_ids)
+        .select_related("participant")
+        .order_by("sequence")
+    )
 
 
 @database_sync_to_async
@@ -88,6 +114,23 @@ def _room_event_ids_after(room_id: uuid.UUID, sequence: int) -> list[str]:
         .order_by("sequence")
         .values_list("id", flat=True)
     ]
+
+
+@database_sync_to_async
+def _room_event_ids_after_limited(room_id: uuid.UUID, sequence: int, limit: int) -> list[str]:
+    return [
+        str(item)
+        for item in RoomEvent.objects.filter(room_id=room_id, sequence__gt=sequence)
+        .order_by("sequence")
+        .values_list("id", flat=True)[: limit + 1]
+    ]
+
+
+@database_sync_to_async
+def _room_events_by_ids(event_ids: list[str]) -> list[RoomEvent]:
+    if not event_ids:
+        return []
+    return list(RoomEvent.objects.filter(id__in=event_ids).order_by("sequence"))
 
 
 @database_sync_to_async
@@ -124,9 +167,11 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
     participant_id: uuid.UUID
     match_id: uuid.UUID
     group_name: str
+    guest_group_name: str
     countdown_task: asyncio.Task[None]
     grace_task: asyncio.Task[None]
     connection_id: uuid.UUID
+    _resync_timestamps: list[float]
 
     async def connect(self) -> None:
         if not settings.ENABLE_WEBSOCKETS:
@@ -144,7 +189,10 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
         self.participant_id = participant.id
         self.connection_id = uuid.uuid4()
         self.group_name = match_group(self.match_id)
+        self.guest_group_name = f"guest.{user.id}"
+        self._resync_timestamps = []
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.channel_layer.group_add(self.guest_group_name, self.channel_name)
         protocols = self.scope.get("subprotocols", [])
         await self.accept(subprotocol="think-fast" if "think-fast" in protocols else None)
         websocket_connected()
@@ -168,6 +216,8 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
             if hasattr(self, "countdown_task"):
                 self.countdown_task.cancel()
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            if hasattr(self, "guest_group_name"):
+                await self.channel_layer.group_discard(self.guest_group_name, self.channel_name)
             delay = await _release(self.participant_id, self.connection_id)
             if delay is not None:
                 self.grace_task = asyncio.create_task(self._expire_after_grace(delay))
@@ -178,6 +228,21 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
 
     async def force_disconnect(self, event: dict[str, object]) -> None:
         await self.close(code=4001)
+
+    async def revoke_disconnect(self, event: dict[str, object]) -> None:
+        await self.close(code=4401)
+
+    def _check_resync_rate_limit(self) -> bool:
+        """Return True if rate limit exceeded."""
+        now = time.monotonic()
+        window = getattr(settings, "RESYNC_RATE_LIMIT_WINDOW_SECONDS", 10)
+        max_count = getattr(settings, "RESYNC_RATE_LIMIT_COUNT", 10)
+        # Clean old timestamps
+        self._resync_timestamps = [t for t in self._resync_timestamps if now - t < window]
+        if len(self._resync_timestamps) >= max_count:
+            return True
+        self._resync_timestamps.append(now)
+        return False
 
     async def receive_json(self, content: object, **kwargs: object) -> None:
         if not isinstance(content, dict) or content.get("type") != "resync":
@@ -196,8 +261,69 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
                 }
             )
             return
-        for event_id in await _event_ids_after(self.match_id, last_sequence):
-            await self.match_event({"event_id": event_id})
+
+        # Per-connection resync rate limiting
+        if self._check_resync_rate_limit():
+            await self.send_json(
+                {
+                    "type": "system.resync_required",
+                    "version": 1,
+                    "match_id": str(self.match_id),
+                    "sequence": 0,
+                    "occurred_at": timezone.now().isoformat().replace("+00:00", "Z"),
+                    "visibility": "connection",
+                    "payload": {"reason": "rate_limited"},
+                }
+            )
+            return
+
+        max_events = getattr(settings, "RESYNC_MAX_EVENTS", 100)
+        batch_size = getattr(settings, "RESYNC_BATCH_SIZE", 50)
+
+        # Fetch limited IDs to detect overflow
+        event_ids = await _event_ids_after_limited(self.match_id, last_sequence, max_events)
+        if len(event_ids) > max_events:
+            await self.send_json(
+                {
+                    "type": "system.resync_required",
+                    "version": 1,
+                    "match_id": str(self.match_id),
+                    "sequence": 0,
+                    "occurred_at": timezone.now().isoformat().replace("+00:00", "Z"),
+                    "visibility": "connection",
+                    "payload": {"reason": "too_many_events"},
+                }
+            )
+            return
+
+        # Batched DB fetching for events
+        for i in range(0, len(event_ids), batch_size):
+            batch_ids = event_ids[i : i + batch_size]
+            batch_events = await _events_by_ids(batch_ids)
+            # Preserve ordering (already ordered by sequence) and gap/duplicate semantics
+            # Private-event filtering and authorization preserved in match_event logic
+            for stored in batch_events:
+                if (
+                    stored.visibility == "participant"
+                    and stored.participant_id != self.participant_id
+                ):
+                    continue
+                if (
+                    stored.event_type == "opponent.guessed"
+                    and stored.participant_id == self.participant_id
+                ):
+                    continue
+                await self.send_json(
+                    {
+                        "type": stored.event_type,
+                        "version": 1,
+                        "match_id": str(stored.match_id),
+                        "sequence": stored.sequence,
+                        "occurred_at": stored.occurred_at.isoformat().replace("+00:00", "Z"),
+                        "visibility": stored.visibility,
+                        "payload": stored.payload,
+                    }
+                )
 
     async def match_event(self, event: dict[str, str]) -> None:
         stored = await _event(event["event_id"])
@@ -231,6 +357,8 @@ def _room_event(event_id: str) -> RoomEvent:
 class RoomConsumer(AsyncJsonWebsocketConsumer):
     room_id: uuid.UUID
     group_name: str
+    guest_group_name: str
+    _resync_timestamps: list[float]
 
     async def connect(self) -> None:
         if not settings.ENABLE_WEBSOCKETS:
@@ -245,7 +373,10 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=4403)
             return
         self.group_name = room_group(self.room_id)
+        self.guest_group_name = f"guest.{user.id}"
+        self._resync_timestamps = []
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.channel_layer.group_add(self.guest_group_name, self.channel_name)
         protocols = self.scope.get("subprotocols", [])
         await self.accept(subprotocol="think-fast" if "think-fast" in protocols else None)
         websocket_connected()
@@ -254,6 +385,24 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
         if hasattr(self, "group_name"):
             websocket_disconnected()
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            if hasattr(self, "guest_group_name"):
+                await self.channel_layer.group_discard(self.guest_group_name, self.channel_name)
+
+    async def force_disconnect(self, event: dict[str, object]) -> None:
+        await self.close(code=4001)
+
+    async def revoke_disconnect(self, event: dict[str, object]) -> None:
+        await self.close(code=4401)
+
+    def _check_resync_rate_limit(self) -> bool:
+        now = time.monotonic()
+        window = getattr(settings, "RESYNC_RATE_LIMIT_WINDOW_SECONDS", 10)
+        max_count = getattr(settings, "RESYNC_RATE_LIMIT_COUNT", 10)
+        self._resync_timestamps = [t for t in self._resync_timestamps if now - t < window]
+        if len(self._resync_timestamps) >= max_count:
+            return True
+        self._resync_timestamps.append(now)
+        return False
 
     async def receive_json(self, content: object, **kwargs: object) -> None:
         if not isinstance(content, dict) or content.get("type") != "resync":
@@ -272,8 +421,54 @@ class RoomConsumer(AsyncJsonWebsocketConsumer):
                 }
             )
             return
-        for event_id in await _room_event_ids_after(self.room_id, last_sequence):
-            await self.room_event({"event_id": event_id})
+
+        if self._check_resync_rate_limit():
+            await self.send_json(
+                {
+                    "type": "system.resync_required",
+                    "version": 1,
+                    "room_id": str(self.room_id),
+                    "sequence": 0,
+                    "occurred_at": timezone.now().isoformat().replace("+00:00", "Z"),
+                    "visibility": "connection",
+                    "payload": {"reason": "rate_limited"},
+                }
+            )
+            return
+
+        max_events = getattr(settings, "RESYNC_MAX_EVENTS", 100)
+        batch_size = getattr(settings, "RESYNC_BATCH_SIZE", 50)
+
+        event_ids = await _room_event_ids_after_limited(self.room_id, last_sequence, max_events)
+        if len(event_ids) > max_events:
+            await self.send_json(
+                {
+                    "type": "system.resync_required",
+                    "version": 1,
+                    "room_id": str(self.room_id),
+                    "sequence": 0,
+                    "occurred_at": timezone.now().isoformat().replace("+00:00", "Z"),
+                    "visibility": "connection",
+                    "payload": {"reason": "too_many_events"},
+                }
+            )
+            return
+
+        for i in range(0, len(event_ids), batch_size):
+            batch_ids = event_ids[i : i + batch_size]
+            batch_events = await _room_events_by_ids(batch_ids)
+            for stored in batch_events:
+                await self.send_json(
+                    {
+                        "type": stored.event_type,
+                        "version": 1,
+                        "room_id": str(stored.room_id),
+                        "sequence": stored.sequence,
+                        "occurred_at": stored.occurred_at.isoformat().replace("+00:00", "Z"),
+                        "visibility": "room",
+                        "payload": stored.payload,
+                    }
+                )
 
     async def room_event(self, event: dict[str, str]) -> None:
         stored = await _room_event(event["event_id"])

@@ -15,6 +15,7 @@ from apps.games.registry import Rules, adapter_for
 from apps.games.secrets import encrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.features import require_match_creation, require_player_authored_challenges
+from apps.matches.idempotency import check_command_prior, fingerprint
 from apps.matches.models import (
     Challenge,
     CommandRecord,
@@ -24,7 +25,6 @@ from apps.matches.models import (
     Room,
     RoomMembership,
 )
-from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_event, record_room_event
 
 JOIN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -35,7 +35,10 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
     if rules is None:
         raise GameAPIError("invalid_request", "Room rules are not available.", status_code=500)
     members = list(room.memberships.all())
-    host_membership = next(member for member in members if member.guest_id == room.host_id)
+    # Defensive: host membership may be missing; fallback to first member if available
+    host_membership = next((member for member in members if member.guest_id == room.host_id), None)
+    if host_membership is None and members:
+        host_membership = members[0]
     viewer_membership = (
         next((member for member in members if member.guest_id == guest.id), None)
         if guest is not None
@@ -49,10 +52,21 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         if latest_match is not None
         else None
     )
+    rematch_payload = None
+    if proposal is not None:
+        requester_member = next(
+            (member for member in members if member.guest_id == proposal.requester_id), None
+        )
+        rematch_payload = {
+            "state": proposal.state,
+            "requester_participant_id": str(requester_member.id) if requester_member else None,
+            "expires_at": proposal.expires_at.isoformat().replace("+00:00", "Z"),
+            "new_match_id": str(proposal.new_match_id) if proposal.new_match_id else None,
+        }
     return {
         "room_id": str(room.id),
         "join_code": room.join_code,
-        "host_participant_id": str(host_membership.id),
+        "host_participant_id": str(host_membership.id) if host_membership else None,
         "viewer_participant_id": str(viewer_membership.id) if viewer_membership else None,
         "preset_id": room.preset_id,
         "rules": rules.snapshot(),
@@ -62,16 +76,7 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         "state": room.state,
         "latest_sequence": room.latest_sequence,
         "latest_match_id": str(latest_match.id) if latest_match else None,
-        "rematch": {
-            "state": proposal.state,
-            "requester_participant_id": str(
-                next(member.id for member in members if member.guest_id == proposal.requester_id)
-            ),
-            "expires_at": proposal.expires_at.isoformat().replace("+00:00", "Z"),
-            "new_match_id": str(proposal.new_match_id) if proposal.new_match_id else None,
-        }
-        if proposal
-        else None,
+        "rematch": rematch_payload,
         "members": [
             {
                 "participant_id": str(member.id),
@@ -101,7 +106,7 @@ def _create_friendly_match(
     countdown_seconds = settings.FRIENDLY_COUNTDOWN_SECONDS
     player_authored = room.challenge_source == Room.ChallengeSource.PLAYERS
     started_at = now + timedelta(seconds=countdown_seconds)
-    is_party = room.room_mode == "party"
+    is_party = room.room_mode == Room.Mode.PARTY
     match = Match.objects.create(
         room=room,
         state=Match.State.SETUP
@@ -227,8 +232,8 @@ def create_room(
     command_id: uuid.UUID,
     preset_id: str,
     challenge_source: str = Room.ChallengeSource.SYSTEM,
-    room_mode: str = "duel",
-    rounds_count: int = 5,
+    room_mode: str = Room.Mode.DUEL,
+    rounds_count: int = Room.DEFAULT_ROUNDS,
 ) -> tuple[Room, bool]:
     require_match_creation()
     if challenge_source == Room.ChallengeSource.PLAYERS:
@@ -313,7 +318,7 @@ def join_room(
         return room, False
     if room.state not in {Room.State.WAITING, Room.State.READY_CHECK}:
         raise GameAPIError("room_full", "Room is no longer joinable.")
-    max_players = 2 if room.room_mode == "duel" else 8
+    max_players = Room.maximum_members(room.room_mode)
     if room.memberships.count() >= max_players:
         raise GameAPIError(
             "room_full", f"Room has reached its maximum capacity of {max_players} players."
@@ -407,12 +412,10 @@ def start_room(
     if room.host_id != guest.id:
         raise GameAPIError("not_room_host", "Only the room host can start.", status_code=403)
     members = list(room.memberships.select_for_update())
-    minimum_players = 2 if room.room_mode == "duel" else 3
+    minimum_players = Room.minimum_members(room.room_mode)
     if len(members) < minimum_players or not all(member.ready for member in members):
-        raise GameAPIError(
-            "not_ready", f"At least {minimum_players} ready players are required."
-        )
-    if room.room_mode == "duel" and len(members) != 2:
+        raise GameAPIError("not_ready", f"At least {minimum_players} ready players are required.")
+    if room.room_mode == Room.Mode.DUEL and len(members) != 2:
         raise GameAPIError("not_ready", "Exactly two ready players are required for Duel mode.")
     if room.state != Room.State.READY_CHECK:
         raise GameAPIError("not_ready", "Room cannot start in its current state.")
@@ -457,17 +460,23 @@ def leave_room(*, guest: GuestIdentity, room_id: uuid.UUID, command_id: uuid.UUI
         payload={"participant_id": str(member.id)},
     )
     member.delete()
-    remaining = RoomMembership.objects.filter(room=room).first()
-    if remaining is None:
+    remaining_members = list(RoomMembership.objects.filter(room=room).select_for_update())
+    if not remaining_members:
         room.state = Room.State.CLOSED
         room.save(update_fields=["state", "updated_at"])
         return None
     if room.host_id == guest.id:
-        room.host = remaining.guest
-    remaining.ready = False
-    remaining.save(update_fields=["ready"])
-    remaining_count = RoomMembership.objects.filter(room=room).count()
-    room.state = Room.State.READY_CHECK if remaining_count >= 2 else Room.State.WAITING
+        room.host = remaining_members[0].guest
+    # Reset readiness for all remaining members to avoid stale readiness
+    RoomMembership.objects.filter(room=room).update(ready=False)
+    remaining_count = len(remaining_members)
+    # Derive the lobby state from the authoritative Party minimum: a Duel needs
+    # two members and a Party needs three. `start_room` enforces the same bound
+    # independently, so this only decides which lobby affordances are shown.
+    minimum_players = Room.minimum_members(room.room_mode)
+    room.state = (
+        Room.State.READY_CHECK if remaining_count >= minimum_players else Room.State.WAITING
+    )
     room.save(update_fields=["host", "state", "updated_at"])
     return room
 
@@ -478,7 +487,11 @@ def room_for_join_code(join_code: str) -> Room | None:
 
 @transaction.atomic
 def kick_member(
-    *, guest: GuestIdentity, room_id: uuid.UUID, target_participant_id: uuid.UUID
+    *,
+    guest: GuestIdentity,
+    room_id: uuid.UUID,
+    target_participant_id: uuid.UUID,
+    command_id: uuid.UUID,
 ) -> Room:
     room = Room.objects.select_for_update().filter(pk=room_id).first()
     if room is None:
@@ -487,26 +500,50 @@ def kick_member(
         raise GameAPIError("not_room_host", "Only the room host can kick.", status_code=403)
     if room.state not in {Room.State.WAITING, Room.State.READY_CHECK}:
         raise GameAPIError("not_ready", "Room cannot be changed in its current state.")
+    request_hash = fingerprint(
+        {"room_id": str(room_id), "target_participant_id": str(target_participant_id)}
+    )
+    prior = check_command_prior(
+        guest=guest, command_id=command_id, operation="kick_member", request_hash=request_hash
+    )
+    if prior is not None:
+        # Idempotent replay: do not repeat mutation
+        return room
     target = RoomMembership.objects.filter(room=room, id=target_participant_id).first()
     if target is None:
         raise GameAPIError("member_not_found", "Member was not found.", status_code=404)
     if target.guest_id == room.host_id:
         raise GameAPIError("invalid_request", "The host cannot be kicked.", status_code=400)
-    host_member = RoomMembership.objects.get(room=room, guest=guest)
+    host_member = RoomMembership.objects.filter(room=room, guest=guest).first()
+    if host_member is None:
+        raise GameAPIError("permission_denied", "You are not a room member.", status_code=403)
     if target.id == host_member.id:
         raise GameAPIError("invalid_request", "You cannot kick yourself.", status_code=400)
-    target.delete()
-    remaining = RoomMembership.objects.filter(room=room).first()
-    if remaining is not None:
-        remaining.ready = False
-        remaining.save(update_fields=["ready"])
+    # Record before deletion
     record_room_event(
         room=room,
         event_type="room.player_left",
         payload={"participant_id": str(target.id)},
     )
-    room.state = Room.State.WAITING
+    target.delete()
+    # Reset readiness for all remaining members, not just one
+    RoomMembership.objects.filter(room=room).update(ready=False)
+    remaining_count = RoomMembership.objects.filter(room=room).count()
+    minimum_players = Room.minimum_members(room.room_mode)
+    if remaining_count == 0:
+        room.state = Room.State.CLOSED
+    elif remaining_count >= minimum_players:
+        room.state = Room.State.READY_CHECK
+    else:
+        room.state = Room.State.WAITING
     room.save(update_fields=["state", "updated_at"])
+    CommandRecord.objects.create(
+        guest=guest,
+        command_id=command_id,
+        operation="kick_member",
+        request_fingerprint=request_hash,
+        room=room,
+    )
     return room
 
 
@@ -523,9 +560,10 @@ def update_room_rules(*, guest: GuestIdentity, room_id: uuid.UUID, preset_id: st
         raise GameAPIError("invalid_request", "Unknown preset_id.", status_code=400)
     room.preset_id = preset_id
     RoomMembership.objects.filter(room=room).update(ready=False)
+    minimum_players = Room.minimum_members(room.room_mode)
     room.state = (
         Room.State.READY_CHECK
-        if RoomMembership.objects.filter(room=room).count() >= 2
+        if RoomMembership.objects.filter(room=room).count() >= minimum_players
         else Room.State.WAITING
     )
     room.save(update_fields=["preset_id", "state", "updated_at"])

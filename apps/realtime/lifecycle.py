@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.analytics.service import record_analytics
 from apps.matches.models import Match, Participant
+from apps.matches.party import abandon_party_participant, is_party_match
 from apps.matches.services import finalize_friendly_abandon
 from apps.realtime.publisher import record_event
 
@@ -96,10 +97,12 @@ def expire_disconnect_grace(
     if participant.grace_expires_at is None or now < participant.grace_expires_at:
         return False
     match = Match.objects.select_for_update().get(pk=participant.match_id)
-    if (
-        match.state not in {Match.State.ACTIVE, Match.State.FINISHING}
-        or participant.solve_state != Participant.SolveState.PLAYING
-    ):
+    if participant.solve_state != Participant.SolveState.PLAYING:
+        return False
+    if is_party_match(match):
+        abandon_party_participant(match, participant, now=now)
+        return True
+    if match.state not in {Match.State.ACTIVE, Match.State.FINISHING}:
         return False
     finalize_friendly_abandon(match, participant, now=now)
     return True

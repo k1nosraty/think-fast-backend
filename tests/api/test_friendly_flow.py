@@ -159,7 +159,7 @@ def test_host_kicks_member() -> None:
     target = joined["members"][1]["participant_id"]
     response = host.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"target_participant_id": target},
+        {"command_id": command()["command_id"], "target_participant_id": target},
         format="json",
     )
     assert response.status_code == 200
@@ -178,14 +178,17 @@ def test_kick_requires_host_and_target_validation() -> None:
     target = joined["members"][1]["participant_id"]
     forbidden = opponent.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"target_participant_id": target},
+        {"command_id": command()["command_id"], "target_participant_id": target},
         format="json",
     )
     assert forbidden.status_code == 403
     assert forbidden.data["code"] == "not_room_host"
     self_kick = host.post(
         f"/api/v1/rooms/{room['room_id']}/kick/",
-        {"target_participant_id": joined["members"][0]["participant_id"]},
+        {
+            "command_id": command()["command_id"],
+            "target_participant_id": joined["members"][0]["participant_id"],
+        },
         format="json",
     )
     assert self_kick.status_code == 400
@@ -206,7 +209,7 @@ def test_host_changes_room_rules_and_resets_ready() -> None:
     )
     assert response.status_code == 200
     assert response.data["preset_id"] == "number_brain_burner_6_v1"
-    assert response.data["state"] == "waiting"
+    assert response.data["state"] == "ready_check"
     assert all(member["ready"] is False for member in response.data["members"])
     forbidden = opponent.post(
         f"/api/v1/rooms/{room['room_id']}/rules/",
@@ -248,3 +251,29 @@ def test_production_countdown_activates_idempotently() -> None:
         "match.countdown_started",
         "match.started",
     ]
+
+
+@pytest.mark.django_db
+def test_gated_word_preset_cannot_create_or_retarget_a_room() -> None:
+    """The gated Word preset is refused for both creation and rules updates.
+
+    `CreateRoomCommand` publishes the same four creatable presets as
+    `/solo-matches/`; accepting a fifth would let a Room reach a Match the
+    client has no renderer for.
+    """
+    host, _ = guest("Amir", "avatar_01")
+    created = host.post("/api/v1/rooms/", command(preset_id="word_classic_5_fa_v1"), format="json")
+    assert created.status_code == 400
+
+    room = host.post("/api/v1/rooms/", command(preset_id="number_classic_5_v1"), format="json")
+    assert room.status_code == 201
+    retargeted = host.post(
+        f"/api/v1/rooms/{room.data['room_id']}/rules/",
+        command(preset_id="word_classic_5_fa_v1"),
+        format="json",
+    )
+    assert retargeted.status_code == 400
+    assert (
+        host.get(f"/api/v1/rooms/{room.data['room_id']}/").data["preset_id"]
+        == "number_classic_5_v1"
+    )

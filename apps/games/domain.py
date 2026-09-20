@@ -16,6 +16,7 @@ from apps.games.word_spike import WORD_PRESETS, WordRules
 # Re-export for backward compatibility
 __all__ = [
     "COLOR_PRESETS",
+    "CREATABLE_PRESET_IDS",
     "NUMBER_PRESETS",
     "PRESETS",
     "WORD_PRESETS",
@@ -33,6 +34,22 @@ PRESETS: dict[str, NumberRules | ColorRules | WordRules] = {
     **COLOR_PRESETS,
     **WORD_PRESETS,
 }
+
+#: Presets a client is allowed to start a Match or Room with.
+#:
+#: The Word prototype is deliberately excluded while it stays gated (see the
+#: workspace README): it is advertised through `/game-definitions/` so the
+#: catalogue can label it as a prototype, but it cannot be instantiated. This
+#: tuple is the single source of truth for that allowlist; the published request
+#: contracts (`contracts/schemas/create-room-command.schema.json` and the
+#: `/solo-matches/` request body) enumerate exactly the same four ids, and
+#: `tests/contracts/test_contracts.py` fails if the two drift apart.
+CREATABLE_PRESET_IDS: tuple[str, ...] = (
+    "number_classic_5_v1",
+    "number_brain_burner_6_v1",
+    "color_classic_5_v1",
+    "color_permutation_8_v1",
+)
 
 
 def rules_for_mode(

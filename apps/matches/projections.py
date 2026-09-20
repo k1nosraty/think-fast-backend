@@ -8,6 +8,7 @@ from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret
 from apps.matches.errors import GameAPIError
 from apps.matches.models import Challenge, Match, Participant
+from apps.matches.party import is_party_match
 
 
 def iso(value: datetime | None) -> str | None:
@@ -25,7 +26,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
     match.refresh_from_db()
     rules = rules_from_snapshot(match.rules)
     history = rules.history_policy
-    is_party = match.room is not None and getattr(match.room, "room_mode", "party") == "party"
+    is_party = is_party_match(match)
     if is_party:
         attempt_rows = list(participant.attempts.filter(round_number=match.round_number))
     else:
@@ -75,7 +76,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 result["secret_revealed"] = False
     actions = []
     if match.state == Match.State.ACTIVE:
-        if not is_party or not participant.is_creator:
+        if not is_party or (match.round_state == "active" and not participant.is_creator):
             actions.append("submit_guess")
         actions.append("leave")
     elif match.state == Match.State.SETUP:

@@ -15,6 +15,7 @@ from apps.matches.models import (
     Room,
     RoomMembership,
 )
+from apps.matches.rematches import rematch_command
 from apps.matches.rooms import (
     create_room,
     join_room,
@@ -300,6 +301,40 @@ def test_leave_room_rejects_reused_command_id() -> None:
 
 
 @pytest.mark.django_db
+def test_leave_room_resets_all_readiness_in_party() -> None:
+    host = _guest("Host")
+    p2 = _guest("P2")
+    p3 = _guest("P3")
+    p4 = _guest("P4")
+    room, _ = create_room(
+        guest=host,
+        command_id=_command(),
+        preset_id="number_classic_5_v1",
+        room_mode="party",
+        rounds_count=3,
+    )
+    join_room(guest=p2, room_id=room.id, command_id=_command())
+    join_room(guest=p3, room_id=room.id, command_id=_command())
+    join_room(guest=p4, room_id=room.id, command_id=_command())
+    set_ready(guest=host, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p2, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p3, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p4, room_id=room.id, command_id=_command(), ready=True)
+    # All ready
+    assert RoomMembership.objects.filter(room=room, ready=True).count() == 4
+    leave_room(guest=p4, room_id=room.id, command_id=_command())
+    room.refresh_from_db()
+    # Remaining members must not retain stale readiness
+    assert RoomMembership.objects.filter(room=room, ready=True).count() == 0
+    # Party minimum is 3, remaining 3 => READY_CHECK
+    assert room.state == Room.State.READY_CHECK
+    # Now leave another, remaining 2 < 3 => WAITING
+    leave_room(guest=p3, room_id=room.id, command_id=_command())
+    room.refresh_from_db()
+    assert room.state == Room.State.WAITING
+
+
+@pytest.mark.django_db
 def test_room_snapshot_includes_members_and_rematch_state() -> None:
     host, opponent = _guest(), _guest()
     room, _, _ = _ready_room(host, opponent)
@@ -331,6 +366,49 @@ def test_room_snapshot_includes_members_and_rematch_state() -> None:
 
 
 @pytest.mark.django_db
+def test_room_snapshot_handles_missing_host_and_requester_left() -> None:
+    host = _guest("Host")
+    p2 = _guest("P2")
+    p3 = _guest("P3")
+    room, _ = create_room(
+        guest=host,
+        command_id=_command(),
+        preset_id="number_classic_5_v1",
+        room_mode="party",
+        rounds_count=3,
+    )
+    join_room(guest=p2, room_id=room.id, command_id=_command())
+    join_room(guest=p3, room_id=room.id, command_id=_command())
+    set_ready(guest=host, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p2, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p3, room_id=room.id, command_id=_command(), ready=True)
+    with patch("apps.games.registry.generate_number_secret", return_value="12345"):
+        match, _ = start_room(guest=host, room_id=room.id, command_id=_command())
+    # Create rematch proposal from host
+    RematchProposal.objects.create(
+        room=room,
+        source_match=match,
+        requester=host,
+        expires_at=timezone.now() + timedelta(seconds=30),
+    )
+    # Host leaves after proposal (simulating requester-left)
+    RoomMembership.objects.filter(room=room, guest=host).delete()
+    # Transfer host to p2 to avoid completely missing host case for this part
+    Room.objects.filter(pk=room.id).update(host=p2)
+    room.refresh_from_db()
+    # Should not raise StopIteration
+    snap = room_snapshot(Room.objects.get(pk=room.id), guest=p2)
+    assert snap["rematch"] is not None
+    # Requester left => requester_participant_id should be None, not crash
+    assert snap["rematch"]["requester_participant_id"] is None
+    # Also test missing host: delete all memberships for host id mismatch
+    Room.objects.filter(pk=room.id).update(host=host)  # host no longer member
+    snap2 = room_snapshot(Room.objects.get(pk=room.id), guest=p2)
+    # host_participant_id should fallback, not raise
+    assert snap2["host_participant_id"] is not None
+
+
+@pytest.mark.django_db
 def test_room_snapshot_viewer_participant_id_is_null_for_non_member() -> None:
     host, opponent = _guest(), _guest()
     room, _ = create_room(guest=host, command_id=_command(), preset_id="number_classic_5_v1")
@@ -358,11 +436,77 @@ def test_kick_member_removes_target_and_resets_ready() -> None:
     join_room(guest=opponent, room_id=room.id, command_id=_command())
     set_ready(guest=host, room_id=room.id, command_id=_command(), ready=True)
     target = RoomMembership.objects.get(room=room, guest=opponent)
-    result = kick_member(guest=host, room_id=room.id, target_participant_id=target.id)
+    result = kick_member(
+        guest=host, room_id=room.id, target_participant_id=target.id, command_id=_command()
+    )
     assert not RoomMembership.objects.filter(room=room, guest=opponent).exists()
     host_member = RoomMembership.objects.get(room=room, guest=host)
     assert host_member.ready is False
     assert result.state == Room.State.WAITING
+
+
+@pytest.mark.django_db
+def test_kick_member_is_idempotent_and_resets_all_ready_in_party() -> None:
+    host = _guest("Host")
+    p2 = _guest("P2")
+    p3 = _guest("P3")
+    room, _ = create_room(
+        guest=host,
+        command_id=_command(),
+        preset_id="number_classic_5_v1",
+        room_mode="party",
+        rounds_count=3,
+    )
+    join_room(guest=p2, room_id=room.id, command_id=_command())
+    join_room(guest=p3, room_id=room.id, command_id=_command())
+    set_ready(guest=host, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p2, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p3, room_id=room.id, command_id=_command(), ready=True)
+    target = RoomMembership.objects.get(room=room, guest=p3)
+    cmd_id = _command()
+    result = kick_member(
+        guest=host, room_id=room.id, target_participant_id=target.id, command_id=cmd_id
+    )
+    assert result.memberships.count() == 2
+    # All remaining ready must be reset
+    assert not RoomMembership.objects.filter(room=room, ready=True).exists()
+    # Party with 2 remaining < minimum 3 => WAITING (correctly derived)
+    assert result.state == Room.State.WAITING
+    # Replay same command_id must not repeat mutation and must be idempotent
+    replay = kick_member(
+        guest=host, room_id=room.id, target_participant_id=target.id, command_id=cmd_id
+    )
+    assert replay.memberships.count() == 2
+    assert replay.id == result.id
+
+
+@pytest.mark.django_db
+def test_kick_member_party_state_derivation() -> None:
+    host = _guest("Host")
+    p2 = _guest("P2")
+    p3 = _guest("P3")
+    p4 = _guest("P4")
+    room, _ = create_room(
+        guest=host,
+        command_id=_command(),
+        preset_id="number_classic_5_v1",
+        room_mode="party",
+        rounds_count=3,
+    )
+    join_room(guest=p2, room_id=room.id, command_id=_command())
+    join_room(guest=p3, room_id=room.id, command_id=_command())
+    join_room(guest=p4, room_id=room.id, command_id=_command())
+    set_ready(guest=host, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p2, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p3, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p4, room_id=room.id, command_id=_command(), ready=True)
+    target = RoomMembership.objects.get(room=room, guest=p4)
+    result = kick_member(
+        guest=host, room_id=room.id, target_participant_id=target.id, command_id=_command()
+    )
+    # 3 remaining >= party minimum 3 => READY_CHECK, not blindly WAITING
+    assert result.state == Room.State.READY_CHECK
+    assert not RoomMembership.objects.filter(room=room, ready=True).exists()
 
 
 @pytest.mark.django_db
@@ -372,22 +516,35 @@ def test_kick_member_validates_host_target_and_state() -> None:
     join_room(guest=opponent, room_id=room.id, command_id=_command())
     target = RoomMembership.objects.get(room=room, guest=opponent)
     with pytest.raises(GameAPIError) as exc_info:
-        kick_member(guest=opponent, room_id=room.id, target_participant_id=target.id)
+        kick_member(
+            guest=opponent,
+            room_id=room.id,
+            target_participant_id=target.id,
+            command_id=_command(),
+        )
     assert exc_info.value.default_code == "not_room_host"
     host_member = RoomMembership.objects.get(room=room, guest=host)
     with pytest.raises(GameAPIError) as exc_info:
-        kick_member(guest=host, room_id=room.id, target_participant_id=host_member.id)
+        kick_member(
+            guest=host, room_id=room.id, target_participant_id=host_member.id, command_id=_command()
+        )
     assert exc_info.value.default_code == "invalid_request"
     with pytest.raises(GameAPIError) as exc_info:
-        kick_member(guest=host, room_id=room.id, target_participant_id=uuid.uuid4())
+        kick_member(
+            guest=host, room_id=room.id, target_participant_id=uuid.uuid4(), command_id=_command()
+        )
     assert exc_info.value.default_code == "member_not_found"
     Room.objects.filter(pk=room.id).update(state=Room.State.CLOSED)
     with pytest.raises(GameAPIError) as exc_info:
-        kick_member(guest=host, room_id=room.id, target_participant_id=target.id)
+        kick_member(
+            guest=host, room_id=room.id, target_participant_id=target.id, command_id=_command()
+        )
     assert exc_info.value.default_code == "not_ready"
     Room.objects.filter(pk=room.id).update(state=Room.State.READY_CHECK)
     with pytest.raises(GameAPIError) as exc_info:
-        kick_member(guest=host, room_id=uuid.uuid4(), target_participant_id=target.id)
+        kick_member(
+            guest=host, room_id=uuid.uuid4(), target_participant_id=target.id, command_id=_command()
+        )
     assert exc_info.value.default_code == "room_not_found"
 
 
@@ -422,3 +579,47 @@ def test_update_room_rules_validates_host_preset_and_state() -> None:
     with pytest.raises(GameAPIError) as exc_info:
         update_room_rules(guest=host, room_id=room.id, preset_id="number_classic_5_v1")
     assert exc_info.value.default_code == "not_ready"
+
+
+@pytest.mark.django_db
+def test_party_rematch_supports_3_to_8_players() -> None:
+    # A Party rematch must respect the same 3-8 bound as `start_room`.
+    host = _guest("Host")
+    p2 = _guest("P2")
+    p3 = _guest("P3")
+    room, _ = create_room(
+        guest=host,
+        command_id=_command(),
+        preset_id="number_classic_5_v1",
+        room_mode="party",
+        rounds_count=3,
+    )
+    join_room(guest=p2, room_id=room.id, command_id=_command())
+    join_room(guest=p3, room_id=room.id, command_id=_command())
+    set_ready(guest=host, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p2, room_id=room.id, command_id=_command(), ready=True)
+    set_ready(guest=p3, room_id=room.id, command_id=_command(), ready=True)
+    with patch("apps.games.registry.generate_number_secret", return_value="12345"):
+        match, _ = start_room(guest=host, room_id=room.id, command_id=_command())
+    # Simulate finished match
+    from apps.matches.models import Match, Result
+
+    Match.objects.filter(pk=match.id).update(state=Match.State.FINISHED)
+    Result.objects.create(
+        match=match, outcome="won", reason="solved", winner_participant_ids=[], secret_revealed=True
+    )
+    match.refresh_from_db()
+    # First player requests rematch
+    _room1, new_match1, created1 = rematch_command(
+        guest=host, match_id=match.id, command_id=_command(), action="request"
+    )
+    assert created1 is True
+    assert new_match1 is None
+    # Second player accepts - should work for 3 players, not fail with room_full
+    room2, new_match2, created2 = rematch_command(
+        guest=p2, match_id=match.id, command_id=_command(), action="request"
+    )
+    assert created2 is True
+    assert new_match2 is not None
+    assert new_match2.participants.count() == 3
+    assert room2.state == Room.State.ACTIVE

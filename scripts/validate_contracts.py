@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
 # Keep in sync with apps/__init__.py CONTRACT_VERSION
 CONTRACT_VERSION = "v1.0.0-draft.1"
-CONTRACT_REVISION = "v1.0.0-draft.1-r2"
+CONTRACT_REVISION = "v1.0.0-draft.1-r3"
 CANONICAL_REPOSITORY = "think-fast-backend"
 
 
@@ -36,6 +36,17 @@ def load_json(path: Path) -> Any:
         raise ContractValidationError(f"cannot load {path.relative_to(ROOT)}: {exc}") from exc
 
 
+def _canonical_bytes(path: Path) -> bytes:
+    """Read a canonical artifact with LF line endings on every platform.
+
+    The digest must identify the artifact *content*, not the host platform's
+    line-ending convention. Without this, a Windows checkout (CRLF working tree
+    under ``core.autocrlf=true``) and a Linux CI runner compute different
+    digests for the same commit.
+    """
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def bundle_sha256(contracts: Path | None = None) -> str:
     """Hash every canonical JSON artifact except the self-referential manifest."""
     contracts = CONTRACTS if contracts is None else contracts
@@ -47,7 +58,7 @@ def bundle_sha256(contracts: Path | None = None) -> str:
         relative = path.relative_to(contracts).as_posix().encode()
         digest.update(relative)
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        digest.update(_canonical_bytes(path))
         digest.update(b"\0")
     return digest.hexdigest()
 
@@ -223,6 +234,8 @@ def validate_openapi(path: Path) -> None:
         raise ContractValidationError("openapi.json: contract version mismatch")
     implemented_paths = {
         "/guest-sessions/",
+        "/guest-sessions/revoke/",
+        "/guest-sessions/ws-ticket/",
         "/game-definitions/",
         "/solo-matches/",
         "/rooms/",

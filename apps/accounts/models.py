@@ -3,6 +3,7 @@ import secrets
 import uuid
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -41,3 +42,39 @@ class GuestIdentity(models.Model):
     @property
     def is_active(self) -> bool:
         return self.revoked_at is None and self.expires_at > timezone.now()
+
+
+class WSTicket(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    guest = models.ForeignKey(GuestIdentity, on_delete=models.CASCADE, related_name="ws_tickets")
+    token_digest = models.CharField(max_length=64, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    @staticmethod
+    def digest_token(token: str) -> str:
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @classmethod
+    def issue(
+        cls, *, guest: GuestIdentity, ttl_seconds: int | None = None
+    ) -> tuple["WSTicket", str]:
+        token = secrets.token_urlsafe(32)
+        now = timezone.now()
+        ttl = (
+            ttl_seconds
+            if ttl_seconds is not None
+            else int(getattr(settings, "WS_TICKET_TTL_SECONDS", 30))
+        )
+        ticket = cls.objects.create(
+            guest=guest,
+            token_digest=cls.digest_token(token),
+            expires_at=now + timedelta(seconds=ttl),
+        )
+        return ticket, token
+
+    @property
+    def is_valid(self) -> bool:
+        now = timezone.now()
+        return self.used_at is None and self.expires_at > now and self.guest.is_active

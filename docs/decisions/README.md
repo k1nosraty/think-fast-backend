@@ -18,7 +18,8 @@ ADRs capture decisions that materially constrain implementation.
 - [ADR-0014: Party Mode Core Gameplay Redesign](0014-party-mode-gameplay-redesign.md)
 
 ADR-0014 supersedes ADR-0007's two-member assumption only for Party Mode:
-Friendly remains a two-player mode, while Party supports 2–8 participants.
+Friendly remains a two-player mode, while Party supports 3–8 participants (one
+Creator plus at least two Guessers, the minimum for placement scoring).
 Implementation and live E2E evidence are tracked in T10 and the workspace
 [`TASKS.md`](../../../TASKS.md).
 

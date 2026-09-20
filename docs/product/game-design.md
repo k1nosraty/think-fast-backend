@@ -242,7 +242,7 @@ both solve simultaneously after countdown
 
 ## Party Mode (1 Creator → Multiple Guessers)
 
-Party Mode simplifies multiplayer group play for 2–8 players into a fast, social, high-energy party loop:
+Party Mode simplifies multiplayer group play for 3–8 players into a fast, social, high-energy party loop:
 
 ```text
              CREATOR (Rotates each round)
@@ -261,7 +261,7 @@ Party Mode simplifies multiplayer group play for 2–8 players into a fast, soci
 - **Core Topology:** One player is chosen as the Creator each round; all other players independently solve against the shared challenge.
 - **Creator Secret Input:** The Creator manually builds the secret within a quick setup window.
 - **Simultaneous Guessing:** All guessers submit guesses concurrently and receive immediate private positional feedback.
-- **Zero Leak Guarantee:** Guessers never see other players' guesses or feedback; the server broadcasts only public solve notifications (`party.player_solved`).
+- **Zero Leak Guarantee:** Guessers never see other players' guesses or feedback; the server broadcasts only public solve notifications (`participant.solved`).
 - **Short Authoritative Timer:** Default 60-second round countdown enforced strictly by the backend.
 - **Party Scoring System:**
   - *Guessers:* Points rewarded based on solve speed and placement: 1st solver (+100), 2nd solver (+75), 3rd solver (+50), remaining solvers (+25).

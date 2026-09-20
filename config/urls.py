@@ -3,7 +3,11 @@
 from django.contrib import admin
 from django.urls import path
 
-from apps.accounts.views import GuestSessionCreateView
+from apps.accounts.views import (
+    GuestSessionCreateView,
+    GuestSessionRevokeView,
+    GuestSessionWSTicketView,
+)
 from apps.games.views import GameDefinitionListView
 from apps.matches.views import (
     ChallengeCommitView,
@@ -32,6 +36,16 @@ urlpatterns = [
     path("health/ready/", ready, name="health-ready"),
     path("metrics/", metrics, name="metrics"),
     path("api/v1/guest-sessions/", GuestSessionCreateView.as_view(), name="guest-session-create"),
+    path(
+        "api/v1/guest-sessions/revoke/",
+        GuestSessionRevokeView.as_view(),
+        name="guest-session-revoke",
+    ),
+    path(
+        "api/v1/guest-sessions/ws-ticket/",
+        GuestSessionWSTicketView.as_view(),
+        name="guest-session-ws-ticket",
+    ),
     path("api/v1/game-definitions/", GameDefinitionListView.as_view(), name="game-definition-list"),
     path("api/v1/solo-matches/", SoloMatchCreateView.as_view(), name="solo-match-create"),
     path("api/v1/rooms/", RoomCreateView.as_view(), name="room-create"),

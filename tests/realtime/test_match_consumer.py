@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from asgiref.sync import async_to_sync, sync_to_async
 from channels.testing import WebsocketCommunicator
@@ -13,7 +15,13 @@ def test_websocket_authorization_and_private_event_projection() -> None:
         host, opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
         match_id = started["match_id"]
         host_token = host._credentials["HTTP_AUTHORIZATION"].removeprefix("Bearer ")
-        opponent_token = opponent._credentials["HTTP_AUTHORIZATION"].removeprefix("Bearer ")
+        # Obtain short-lived single-use ticket for opponent via HTTPS
+        opponent_ticket_resp = await sync_to_async(opponent.post, thread_sensitive=True)(
+            "/api/v1/guest-sessions/ws-ticket/", {}, format="json"
+        )
+        assert opponent_ticket_resp.status_code == 201
+        opponent_ticket = opponent_ticket_resp.data["ticket"]
+
         host_ws = WebsocketCommunicator(
             application,
             f"/ws/v1/matches/{match_id}/",
@@ -22,13 +30,15 @@ def test_websocket_authorization_and_private_event_projection() -> None:
                 (b"authorization", f"Bearer {host_token}".encode()),
             ],
         )
+        assert (await host_ws.connect())[0] is True
+        # Small delay to avoid sqlite table lock on concurrent claims in test DB
+        await asyncio.sleep(0.2)
         opponent_ws = WebsocketCommunicator(
             application,
             f"/ws/v1/matches/{match_id}/",
             headers=[(b"origin", b"http://testserver")],
-            subprotocols=["think-fast", f"bearer.{opponent_token}"],
+            subprotocols=["think-fast", f"ticket.{opponent_ticket}"],
         )
-        assert (await host_ws.connect())[0] is True
         connected, subprotocol = await opponent_ws.connect()
         assert connected is True
         assert subprotocol == "think-fast"
@@ -121,5 +131,107 @@ def test_room_websocket_delivers_join_and_ready_without_private_game_data() -> N
         assert ready_event["type"] == "room.ready_changed"
         assert ready_event["payload"]["ready"] is True
         await room_ws.disconnect()
+
+    async_to_sync(scenario)()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_websocket_ticket_is_single_use_and_revoked_session_rejected() -> None:
+    async def scenario() -> None:
+        _host, opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
+        match_id = started["match_id"]
+
+        # Issue ticket
+        ticket_resp = await sync_to_async(opponent.post, thread_sensitive=True)(
+            "/api/v1/guest-sessions/ws-ticket/", {}, format="json"
+        )
+        assert ticket_resp.status_code == 201
+        ticket = ticket_resp.data["ticket"]
+
+        # First use succeeds
+        ws1 = WebsocketCommunicator(
+            application,
+            f"/ws/v1/matches/{match_id}/",
+            headers=[(b"origin", b"http://testserver")],
+            subprotocols=["think-fast", f"ticket.{ticket}"],
+        )
+        connected, _ = await ws1.connect()
+        assert connected is True
+        # Drain initial events
+        await ws1.receive_json_from(timeout=1)
+        await ws1.receive_json_from(timeout=1)
+        await ws1.disconnect()
+        await asyncio.sleep(0.1)
+
+        # Second use of same ticket must fail (single-use)
+        ws2 = WebsocketCommunicator(
+            application,
+            f"/ws/v1/matches/{match_id}/",
+            headers=[(b"origin", b"http://testserver")],
+            subprotocols=["think-fast", f"ticket.{ticket}"],
+        )
+        connected, code = await ws2.connect()
+        assert connected is False
+        assert code == 4401
+
+        # Revoke opponent session
+        revoke_resp = await sync_to_async(opponent.post, thread_sensitive=True)(
+            "/api/v1/guest-sessions/revoke/", {}, format="json"
+        )
+        assert revoke_resp.status_code == 200
+
+        # Old bearer token cannot establish WS after revoke
+        opponent_token = opponent._credentials["HTTP_AUTHORIZATION"].removeprefix("Bearer ")
+        ws3 = WebsocketCommunicator(
+            application,
+            f"/ws/v1/matches/{match_id}/",
+            headers=[
+                (b"origin", b"http://testserver"),
+                (b"authorization", f"Bearer {opponent_token}".encode()),
+            ],
+        )
+        connected, code = await ws3.connect()
+        assert connected is False
+        assert code == 4401
+
+        # REST also rejected after revoke
+        ticket_after_revoke = await sync_to_async(opponent.post, thread_sensitive=True)(
+            "/api/v1/guest-sessions/ws-ticket/", {}, format="json"
+        )
+        assert ticket_after_revoke.status_code == 401
+
+    async_to_sync(scenario)()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_revoke_closes_active_websocket_sessions() -> None:
+    async def scenario() -> None:
+        host, _opponent, started = await sync_to_async(active_match, thread_sensitive=True)()
+        match_id = started["match_id"]
+        host_token = host._credentials["HTTP_AUTHORIZATION"].removeprefix("Bearer ")
+
+        host_ws = WebsocketCommunicator(
+            application,
+            f"/ws/v1/matches/{match_id}/",
+            headers=[
+                (b"origin", b"http://testserver"),
+                (b"authorization", f"Bearer {host_token}".encode()),
+            ],
+        )
+        assert (await host_ws.connect())[0] is True
+        # Drain initial events
+        await host_ws.receive_json_from(timeout=1)
+        await host_ws.receive_json_from(timeout=1)
+
+        # Revoke while WS is active
+        revoke_resp = await sync_to_async(host.post, thread_sensitive=True)(
+            "/api/v1/guest-sessions/revoke/", {}, format="json"
+        )
+        assert revoke_resp.status_code == 200
+
+        # Active WS should be closed with 4401
+        close_event = await host_ws.receive_output(timeout=1)
+        assert close_event["type"] == "websocket.close"
+        assert close_event["code"] == 4401
 
     async_to_sync(scenario)()
