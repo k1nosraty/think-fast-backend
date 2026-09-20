@@ -174,10 +174,7 @@ unless `DJANGO_SECRET_KEY` is strong and `DJANGO_ALLOWED_HOSTS`,
 `POSTGRES_PASSWORD`, `REDIS_URL`, and `GAME_SECRET_ENCRYPTION_KEY` are explicit.
 Run migrations as a separate release step before application replicas.
 
-Run `uv run python manage.py sweep_reliability --limit 100` at least once per
-second in a single scheduled worker. It converges persisted countdown/deadline
-and disconnect-grace state after process restarts and retries due outbox rows.
-`publish_outbox` is available when only delivery retry is desired.
+Run `uv run python manage.py run_reliability_worker --limit 100 --interval 1` as a single long-running worker; it loops with configurable interval, shuts down cleanly on SIGTERM, and converges persisted countdown/deadline and disconnect-grace state after process restarts plus retries due outbox rows. For one-shot execution, `uv run python manage.py sweep_reliability --limit 100` (or with `--loop --interval 1`) remains available. `publish_outbox` is available when only delivery retry is desired.
 
 Export shareable aggregate playtest data without raw guesses or secrets:
 

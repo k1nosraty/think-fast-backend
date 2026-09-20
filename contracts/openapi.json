@@ -916,6 +916,87 @@
           }
         }
       }
+    },
+    "/guest-sessions/revoke/": {
+      "post": {
+        "operationId": "revokeGuestSession",
+        "summary": "Revoke current guest session and close active WebSocket sessions",
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "revoked"
+                  ],
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/guest-sessions/ws-ticket/": {
+      "post": {
+        "operationId": "createWSTicket",
+        "summary": "Issue short-lived single-use WebSocket ticket over HTTPS",
+        "security": [
+          {
+            "guestBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "WS ticket issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ticket",
+                    "expires_at"
+                  ],
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1122,7 +1203,10 @@
             "pattern": "^[A-HJ-NP-Z2-9]{6}$"
           },
           "host_participant_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "viewer_participant_id": {
@@ -1183,7 +1267,10 @@
                 ]
               },
               "requester_participant_id": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "format": "uuid"
               },
               "expires_at": {
@@ -1294,9 +1381,14 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "command_id",
           "target_participant_id"
         ],
         "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "target_participant_id": {
             "type": "string",
             "format": "uuid"
