@@ -260,3 +260,23 @@ def test_attempt_limit_finishes_unsolved_and_preserves_full_history() -> None:
     assert snapshot.data["result"]["outcome"] == "unsolved"
     assert snapshot.data["result"]["reason"] == "attempt_limit"
     assert len(snapshot.data["own_attempts"]) == 12
+
+
+@pytest.mark.django_db
+def test_gated_word_preset_cannot_start_a_solo_match() -> None:
+    """The Word prototype is catalogued but not instantiable.
+
+    `contracts/openapi.json` enumerates the creatable presets for
+    `/solo-matches/` and does not include `word_classic_5_fa_v1`; the API must
+    reject it rather than creating a Match the client cannot render.
+    """
+    client = APIClient()
+    _, token = create_guest(client)
+    authorize(client, token)
+    response = client.post(
+        "/api/v1/solo-matches/",
+        {"command_id": str(uuid.uuid4()), "preset_id": "word_classic_5_fa_v1"},
+        format="json",
+    )
+    assert response.status_code == 400
+    assert Match.objects.count() == 0

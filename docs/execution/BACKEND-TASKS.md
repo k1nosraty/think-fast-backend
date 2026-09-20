@@ -4,7 +4,7 @@ This is the canonical Django work plan. Give an AI agent exactly one task with
 the current repository. The separate React repository has its own task plan.
 The cross-repository status source is the workspace [`TASKS.md`](../../../TASKS.md);
 the historical “next task” sentences below describe sequencing at the time and
-must not override its current active task (TF-06 after TF-05).
+must not override its current active task (TF-07 after TF-06).
 
 ## Prompt prefix for every task
 
@@ -229,7 +229,7 @@ vertical tasks. Do not ask one AI agent to implement all competitive features.
 **Status:** `Implemented · Unit-tested · E2E-verified` (2026-09-18)
 
 **Bounded outcome:** Party Mode supports a 1 Creator → Multiple Guessers room
-with 2–8 participants, authoritative 60-second rounds, placement scoring,
+with 3–8 participants, authoritative 60-second rounds, placement scoring,
 creator rotation, rematch and recovery-safe command handling. This task does
 not change the two-player Friendly rules and does not authorize Ranked work.
 

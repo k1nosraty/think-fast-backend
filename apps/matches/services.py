@@ -34,11 +34,9 @@ from apps.realtime.publisher import record_event
 __all__ = [
     "abandon",
     "activate_countdown",
-    "check_command_prior",
     "commit_any_challenge",
     "create_solo",
     "finalize_friendly_abandon",
-    "fingerprint",
     "refresh_match_state",
     "submit_any_guess",
     "submit_guess",
@@ -602,7 +600,7 @@ def submit_any_guess(
 ) -> tuple[Attempt, Match, bool]:
     """Unified guess submission dispatching to party or solo/duel mode."""
     match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
-    if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
+    if match_obj is not None and is_party_match(match_obj):
         from apps.matches.party import submit_party_guess
 
         return submit_party_guess(
@@ -621,7 +619,7 @@ def commit_any_challenge(
 ) -> tuple[Match, bool]:
     """Unified challenge commit dispatching to party or player-authored challenge."""
     match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
-    if match_obj and match_obj.room and getattr(match_obj.room, "room_mode", "party") == "party":
+    if match_obj is not None and is_party_match(match_obj):
         from apps.matches.party import commit_party_secret
 
         return commit_party_secret(

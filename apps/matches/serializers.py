@@ -1,17 +1,21 @@
 from rest_framework import serializers
 
-from apps.games.domain import PRESETS
+from apps.games.domain import CREATABLE_PRESET_IDS
+from apps.matches.models import Room
 
 
 class CreateSoloSerializer(serializers.Serializer[dict[str, object]]):
     command_id = serializers.UUIDField()
-    preset_id = serializers.ChoiceField(choices=list(PRESETS))
+    # Gated presets (Word) are intentionally absent; see `CREATABLE_PRESET_IDS`.
+    preset_id = serializers.ChoiceField(choices=list(CREATABLE_PRESET_IDS))
 
 
 class CreateRoomSerializer(CreateSoloSerializer):
-    challenge_source = serializers.ChoiceField(choices=["system", "players"], default="system")
-    room_mode = serializers.ChoiceField(choices=["party", "duel"], default="duel")
-    rounds_count = serializers.IntegerField(min_value=1, max_value=15, default=5)
+    challenge_source = serializers.ChoiceField(
+        choices=Room.ChallengeSource.values, default=Room.ChallengeSource.SYSTEM
+    )
+    room_mode = serializers.ChoiceField(choices=Room.Mode.values, default=Room.Mode.DUEL)
+    rounds_count = serializers.IntegerField(min_value=1, max_value=15, default=Room.DEFAULT_ROUNDS)
 
 
 class GuessSerializer(serializers.Serializer[dict[str, object]]):
@@ -32,7 +36,9 @@ class KickMemberSerializer(CommandSerializer):
 
 
 class UpdateRoomRulesSerializer(serializers.Serializer[dict[str, object]]):
-    preset_id = serializers.ChoiceField(choices=list(PRESETS))
+    # Same gated allowlist as creation: a Room must not be switched to a preset
+    # that cannot be instantiated.
+    preset_id = serializers.ChoiceField(choices=list(CREATABLE_PRESET_IDS))
 
 
 class RematchSerializer(CommandSerializer):

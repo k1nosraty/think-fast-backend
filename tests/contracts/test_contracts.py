@@ -156,6 +156,27 @@ class ContractTest(unittest.TestCase):
         with self.assertRaises(validator.ContractValidationError):
             validator.validate(broken, schema, schema_path)
 
+    def test_creatable_presets_match_the_published_request_contracts(self) -> None:
+        """The gated-preset allowlist must equal what the contracts publish.
+
+        `/solo-matches/` and `CreateRoomCommand` both enumerate the presets a
+        client may instantiate. If the code allowlist and those enums drift, the
+        implementation either rejects a documented preset or accepts a gated one
+        (the Word prototype) that the client cannot play.
+        """
+        from apps.games.domain import CREATABLE_PRESET_IDS
+
+        document = json.loads((ROOT / "contracts/openapi.json").read_text(encoding="utf-8"))
+        solo_enum = document["paths"]["/solo-matches/"]["post"]["requestBody"]["content"][
+            "application/json"
+        ]["schema"]["properties"]["preset_id"]["enum"]
+        room_schema = json.loads(
+            (ROOT / "contracts/schemas/create-room-command.schema.json").read_text(encoding="utf-8")
+        )
+        room_enum = room_schema["properties"]["preset_id"]["enum"]
+        self.assertEqual(list(CREATABLE_PRESET_IDS), solo_enum)
+        self.assertEqual(list(CREATABLE_PRESET_IDS), room_enum)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,7 @@ This document explains protocol principles, resources, events, errors, and
 recovery. T0 is complete: the canonical machine-readable source is
 `contracts/openapi.json`, its JSON Schemas, manifest, and fixtures at
 `v1.0.0-draft.1`. The current compatible bundle revision is
-`v1.0.0-draft.1-r2`; `contracts/manifest.json` records that revision, every
+`v1.0.0-draft.1-r3`; `contracts/manifest.json` records that revision, every
 canonical fixture, and the deterministic SHA-256 of all other JSON artifacts.
 
 ## Global rules
@@ -58,17 +58,23 @@ edited by hand.
 ## Party contract
 
 `POST /rooms/` accepts `room_mode: party` and `rounds_count` from 1 through 15;
-omitting them preserves the `duel` and 5-round defaults. Party rooms allow up
-to eight members. Room snapshots expose both fields.
+omitting them preserves the `duel` and 5-round defaults. A Duel room holds
+exactly two members. A Party room holds three to eight members: one Creator plus
+at least two Guessers, which is the minimum for placement scoring (1st/2nd/3rd)
+to be meaningful. `Room.minimum_members()`/`Room.maximum_members()` are the
+authoritative capacity policy; the start, join and rematch paths all read it
+rather than re-deriving the numbers. Room snapshots expose both fields.
 
 A Party match snapshot uses the common Snapshot schema plus `round_number`,
-`total_rounds`, `creator_participant_id`, per-participant `score` and
-`is_creator`, the `scores` map, and `round_state`. Only the current creator may
-commit the round challenge; non-creators may submit guesses. After
-`round.finished`, `next_round` appears in `available_actions` while another
- round remains. `POST /matches/{match_id}/next-round/` accepts the common
- `command_id` body, advances to the next round or returns the terminal match
- snapshot, and is retry-safe for the same participant and command identity.
+`total_rounds`, `creator_participant_id`, per-participant `score`, `round_score`,
+`round_rank` and `is_creator`, the `scores` map, and `round_state`. Only the
+current creator may commit the round challenge; non-creators may submit guesses.
+After `round.finished`, `next_round` appears in `available_actions` while another
+round remains. `POST /matches/{match_id}/next-round/` accepts the common
+`command_id` body, advances to the next round or returns the terminal match
+snapshot, and is retry-safe for the same participant and command identity. A
+Party Match that can no longer field the minimum number of active players is
+terminated with `Result.reason = not_enough_players`.
 
 Party events use the common ordered envelope. The canonical
 `party-round-finished.json` fixture freezes the public round summary, revealed
@@ -156,9 +162,15 @@ Candidate event types:
 | `match.started` | match public | authoritative active state/deadline |
 | `guess.evaluated` | participant private | accepted Attempt and Feedback |
 | `opponent.guessed` | opponent public | pressure/progress without Guess |
-| `participant.solved` | match public | solve status, not private history |
+| `participant.solved` | match public | solve status, not private history; carries `participant_id` and `attempt_count`, plus `display_name`, `solve_duration_ms` and `round_number` in Party |
 | `participant.disconnected` | match public | presence |
 | `participant.reconnected` | match public | presence |
+| `creator.selected` | match public | first-round Creator announcement |
+| `creator.rotated` | match public | Creator hand-over for a new round or after a Creator leaves |
+| `round.created` | match public | new Party round identity, Creator and setup expiry |
+| `round.started` | match public | authoritative round start and deadline |
+| `round.finished` | match public | public round summary: ranked solvers, Creator score, revealed secret and score map |
+| `scores.updated` | match public | per-participant total score map for the round |
 | `match.finished` | viewer-specific | result and authorized reveal |
 | `rematch.requested` | room public | pending proposal and expiry |
 | `rematch.accepted` | room public | new Match identity |

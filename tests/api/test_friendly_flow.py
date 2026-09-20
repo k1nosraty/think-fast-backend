@@ -251,3 +251,29 @@ def test_production_countdown_activates_idempotently() -> None:
         "match.countdown_started",
         "match.started",
     ]
+
+
+@pytest.mark.django_db
+def test_gated_word_preset_cannot_create_or_retarget_a_room() -> None:
+    """The gated Word preset is refused for both creation and rules updates.
+
+    `CreateRoomCommand` publishes the same four creatable presets as
+    `/solo-matches/`; accepting a fifth would let a Room reach a Match the
+    client has no renderer for.
+    """
+    host, _ = guest("Amir", "avatar_01")
+    created = host.post("/api/v1/rooms/", command(preset_id="word_classic_5_fa_v1"), format="json")
+    assert created.status_code == 400
+
+    room = host.post("/api/v1/rooms/", command(preset_id="number_classic_5_v1"), format="json")
+    assert room.status_code == 201
+    retargeted = host.post(
+        f"/api/v1/rooms/{room.data['room_id']}/rules/",
+        command(preset_id="word_classic_5_fa_v1"),
+        format="json",
+    )
+    assert retargeted.status_code == 400
+    assert (
+        host.get(f"/api/v1/rooms/{room.data['room_id']}/").data["preset_id"]
+        == "number_classic_5_v1"
+    )

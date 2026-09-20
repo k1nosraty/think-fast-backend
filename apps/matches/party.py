@@ -33,7 +33,9 @@ CREATOR_PER_UNSOLVED_BONUS = 20
 CREATOR_MINIMUM_POINTS = 20
 DEFAULT_ROUND_DURATION_SECONDS = 60
 DEFAULT_SETUP_DURATION_SECONDS = 90
-PARTY_MINIMUM_ACTIVE_PLAYERS = 3
+# A Party match needs one creator plus two guessers; below that the round can no
+# longer produce meaningful placement scoring.
+PARTY_MINIMUM_ACTIVE_PLAYERS = Room.minimum_members(Room.Mode.PARTY)
 
 
 # Configurable via settings, with fallbacks to defaults for backward compatibility
@@ -46,9 +48,15 @@ def _party_round_seconds() -> int:
 
 
 def is_party_match(match: Match) -> bool:
+    """True when the Match belongs to a Party Room.
+
+    This is the single place that decides Party vs Duel/Solo routing; callers
+    must not re-implement the `room_mode == "party"` check.
+    """
     if match.room_id is None:
         return False
-    return Room.objects.filter(pk=match.room_id, room_mode="party").exists()
+    room = match.room
+    return room is not None and room.room_mode == Room.Mode.PARTY
 
 
 def get_current_round_challenge(match: Match) -> Challenge | None:
@@ -174,7 +182,7 @@ def commit_party_secret(
     )
 
     countdown_seconds = getattr(settings, "FRIENDLY_COUNTDOWN_SECONDS", 5)
-    round_duration = getattr(rules, "match_deadline_seconds", _party_round_seconds())
+    round_duration = _party_round_seconds()
     started_at = current + timedelta(seconds=countdown_seconds)
     deadline = started_at + timedelta(seconds=round_duration)
 
@@ -467,7 +475,7 @@ def abandon_party_participant(match: Match, participant: Participant, *, now: da
         reason="abandoned",
     )
     if _party_active_players(match) < PARTY_MINIMUM_ACTIVE_PLAYERS:
-        _terminate_party_match(match, reason="not_enough_players", now=now)
+        _terminate_party_match(match, reason=Result.Reason.NOT_ENOUGH_PLAYERS, now=now)
         return
     if match.round_state == "creator_setup":
         if match.creator_id == participant.id:
@@ -612,7 +620,7 @@ def submit_party_guess(
     if solved:
         record_event(
             match=match,
-            event_type="player.solved",
+            event_type="participant.solved",
             visibility="match",
             payload={
                 "participant_id": str(participant.id),

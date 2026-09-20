@@ -583,7 +583,7 @@ def test_update_room_rules_validates_host_preset_and_state() -> None:
 
 @pytest.mark.django_db
 def test_party_rematch_supports_3_to_8_players() -> None:
-    # Option A selected: Extend rematch to support 2-8 players
+    # A Party rematch must respect the same 3-8 bound as `start_room`.
     host = _guest("Host")
     p2 = _guest("P2")
     p3 = _guest("P3")

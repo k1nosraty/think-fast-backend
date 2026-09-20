@@ -6,16 +6,16 @@ The server owns rules, secrets, timing, accepted attempts, feedback, and results
 
 T0–T7 are `Implemented` and `Unit-tested`; their bounded evidence is in
 [`docs/execution/BACKEND-TASKS.md`](docs/execution/BACKEND-TASKS.md). T10 Party
-Mode is additionally `E2E-verified` for 2–8 players. T8's single-host
+Mode is additionally `E2E-verified` for 3–8 players. T8's single-host
 validation baseline is `Implemented` and `Unit-tested`, but no Backend feature
 is yet `Staging-verified` or `Production-approved`. Word remains gated behind
 licensed dictionary evidence. Cross-repository status and the next task are
-owned by the workspace [`TASKS.md`](../TASKS.md); after TF-05 the next task is
-TF-06 (CI completion).
+owned by the workspace [`TASKS.md`](../TASKS.md); the next cross-repository task
+is TF-07 (structured user playtest), with TF-08 (staging/release gate) after it.
 
 ## MVP
 
-The implementation baseline is deliberately narrow:
+The original MVP baseline was deliberately narrow:
 
 - responsive web/PWA client (maintained by the frontend team);
 - guest-first identity with an account upgrade path;
@@ -25,8 +25,13 @@ The implementation baseline is deliberately narrow:
 - room, ready, countdown, realtime progress, reconnect, result, and rematch;
 - REST commands/snapshots plus versioned WebSocket events.
 
-Player-authored duels and Word are explicit expansion work, not prerequisites
-for the first playable MVP.
+Everything above is `Implemented · Unit-tested`. T6 (Color Classic and
+Permutation), T7 (player-authored friendly challenges) and T10 (Party Mode) were
+delivered after that baseline and are `Implemented · Unit-tested` as well; T10 is
+additionally `E2E-verified`. Word is **not** shippable: the bounded T7 spike
+returned NO-GO for production and the preset is therefore absent from
+`apps.games.domain.CREATABLE_PRESET_IDS`, so `/game-definitions/` advertises it
+as a prototype that cannot be instantiated.
 Ranked, teams, tournaments, chat, monetization, and microservices are later.
 
 ## Read this first
@@ -137,9 +142,12 @@ WS   /ws/v1/matches/{match_id}/
 WS   /ws/v1/rooms/{room_id}/
 ```
 
-Native clients may send `Authorization: Bearer <token>` in the WebSocket
+Native clients may send `Authorization: Bearer <guest token>` in the WebSocket
 handshake. Browsers should request subprotocols `think-fast` and
-`bearer.<token>`; query-string tokens are rejected.
+`ticket.<token>`, where `<token>` is the short-lived single-use ticket returned
+by `POST /api/v1/guest-sessions/ws-ticket/`. A `bearer.<token>` subprotocol is
+deliberately rejected so a long-lived credential never appears in WebSocket
+metadata; query-string tokens are rejected.
 
 Clients send `{"type":"resync","last_sequence":N}` after a detected gap.
 Stored authorized events after `N` are replayed in order. Duplicates are valid

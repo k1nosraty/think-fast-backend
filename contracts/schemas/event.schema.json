@@ -12,7 +12,7 @@
         "room.player_joined", "room.player_left", "room.ready_changed", "room.rules_changed",
         "challenge.setup_started", "challenge.committed", "challenge.setup_progress",
         "challenge.setup_cancelled", "match.countdown_started", "match.started", "guess.evaluated",
-        "opponent.guessed", "participant.solved", "player.solved", "participant.disconnected",
+        "opponent.guessed", "participant.solved", "participant.disconnected",
         "participant.reconnected", "round.created", "round.started", "round.finished",
         "creator.selected", "creator.rotated", "scores.updated",
         "match.finished", "rematch.requested",
@@ -69,6 +69,117 @@
       }
     },
     {
+      "if": {"properties": {"type": {"const": "participant.solved"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["participant_id", "attempt_count"],
+            "properties": {
+              "participant_id": {"type": "string", "format": "uuid"},
+              "attempt_count": {"type": "integer", "minimum": 1},
+              "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "solve_duration_ms": {"type": "integer", "minimum": 0},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "creator.selected"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["creator_participant_id", "creator_display_name", "round_number"],
+            "properties": {
+              "creator_participant_id": {"type": "string", "format": "uuid"},
+              "creator_display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "creator.rotated"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["new_creator_participant_id", "new_creator_display_name", "round_number"],
+            "properties": {
+              "new_creator_participant_id": {"type": "string", "format": "uuid"},
+              "new_creator_display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "round.created"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["round_number", "total_rounds", "creator_participant_id", "creator_display_name", "expires_at"],
+            "properties": {
+              "round_number": {"type": "integer", "minimum": 1},
+              "total_rounds": {"type": "integer", "minimum": 1},
+              "creator_participant_id": {"type": "string", "format": "uuid"},
+              "creator_display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+              "expires_at": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "round.started"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["round_number", "started_at", "deadline"],
+            "properties": {
+              "round_number": {"type": "integer", "minimum": 1},
+              "started_at": {"type": "string", "format": "date-time"},
+              "deadline": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "scores.updated"}}},
+      "then": {
+        "properties": {
+          "visibility": {"const": "match"},
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scores", "round_number"],
+            "properties": {
+              "scores": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+              "round_number": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    {
       "if": {"properties": {"type": {"const": "round.finished"}}},
       "then": {
         "properties": {
@@ -80,17 +191,19 @@
             "properties": {
               "round_number": {"type": "integer", "minimum": 1},
               "total_rounds": {"type": "integer", "minimum": 1},
-              "reason": {"enum": ["all_solved", "deadline"]},
+              "reason": {"enum": ["solved", "deadline", "abandoned"]},
               "solvers": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["participant_id", "display_name", "attempt_count", "solve_duration_ms"],
+                  "required": ["participant_id", "display_name", "rank", "round_score", "total_score", "solve_duration_ms"],
                   "properties": {
                     "participant_id": {"type": "string", "format": "uuid"},
                     "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
-                    "attempt_count": {"type": "integer", "minimum": 1},
+                    "rank": {"type": "integer", "minimum": 1},
+                    "round_score": {"type": "integer", "minimum": 0},
+                    "total_score": {"type": "integer", "minimum": 0},
                     "solve_duration_ms": {"type": "integer", "minimum": 0}
                   }
                 }
@@ -101,18 +214,21 @@
                   {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["participant_id", "display_name"],
+                    "required": ["participant_id", "display_name", "round_score", "total_score"],
                     "properties": {
                       "participant_id": {"type": "string", "format": "uuid"},
-                      "display_name": {"type": "string", "minLength": 1, "maxLength": 20}
+                      "display_name": {"type": "string", "minLength": 1, "maxLength": 20},
+                      "round_score": {"type": "integer", "minimum": 0},
+                      "total_score": {"type": "integer", "minimum": 0}
                     }
                   }
                 ]
               },
               "revealed_secret": {
                 "oneOf": [
-                  {"type": "string", "pattern": "^[0-9]{5,6}$"},
-                  {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
+                  {"type": "null"},
+                  {"type": "string"},
+                  {"type": "array", "minItems": 1, "items": {"type": "string"}}
                 ]
               },
               "scores": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}

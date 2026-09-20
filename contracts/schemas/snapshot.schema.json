@@ -17,6 +17,7 @@
     "rules": {"$ref": "ruleset.schema.json"},
     "server_time": {"type": "string", "format": "date-time"},
     "started_at": {"type": ["string", "null"], "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
     "deadline": {"type": ["string", "null"], "format": "date-time"},
     "viewer": {
       "type": "object",
@@ -43,7 +44,10 @@
           "connection_state": {"enum": ["connected", "disconnected", "abandoned"]},
           "attempt_count": {"type": "integer", "minimum": 0},
           "solve_state": {"enum": ["playing", "solved", "unsolved", "abandoned"]},
+          "solve_duration_seconds": {"type": ["integer", "null"], "minimum": 0},
           "score": {"type": "integer", "minimum": 0},
+          "round_score": {"type": "integer", "minimum": 0},
+          "round_rank": {"type": ["integer", "null"], "minimum": 1},
           "is_creator": {"type": "boolean"}
         }
       }
@@ -59,7 +63,7 @@
           "ordinal": {"type": "integer", "minimum": 1},
           "guess": {
             "oneOf": [
-              {"type": "string", "pattern": "^[0-9]{5,6}$"},
+              {"type": "string"},
               {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
             ]
           },
@@ -82,7 +86,7 @@
             "committed_count": {"type": "integer", "minimum": 0, "maximum": 8},
             "required_count": {"type": "integer", "minimum": 1, "maximum": 8},
             "is_creator": {"type": "boolean"},
-            "creator_participant_id": {"type": "string", "format": "uuid"}
+            "creator_participant_id": {"type": ["string", "null"], "format": "uuid"}
           }
         }
       ]
@@ -97,11 +101,12 @@
           "properties": {
             "outcome": {"enum": ["won", "lost", "draw", "unsolved", "abandoned", "voided"]},
             "winner_participant_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}},
-            "reason": {"enum": ["solved", "deadline", "attempt_limit", "abandoned", "voided"]},
+            "reason": {"enum": ["solved", "deadline", "attempt_limit", "abandoned", "not_enough_players", "voided"]},
             "secret_revealed": {"type": "boolean"},
+            "winner_solve_duration_seconds": {"type": ["integer", "null"], "minimum": 0},
             "revealed_secret": {
               "oneOf": [
-                {"type": "string", "pattern": "^[0-9]{5,6}$"},
+                {"type": "string"},
                 {"type": "array", "minItems": 5, "maxItems": 8, "items": {"type": "string"}}
               ]
             }

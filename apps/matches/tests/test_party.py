@@ -7,7 +7,15 @@ from django.utils import timezone
 
 from apps.accounts.models import GuestIdentity
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Match, MatchEvent, Participant, Result, Room
+from apps.matches.models import (
+    Match,
+    MatchEvent,
+    Participant,
+    RematchProposal,
+    Result,
+    Room,
+    RoomMembership,
+)
 from apps.matches.party import (
     advance_party_round,
     commit_party_secret,
@@ -1074,3 +1082,58 @@ class PartyModeTests(TestCase):
             "72941",
             json.dumps(MatchEvent.objects.get(match=match, event_type="match.finished").payload),
         )
+
+    @override_settings(PARTY_ROUND_DURATION_SECONDS=45)
+    def test_party_round_uses_configured_round_duration(self) -> None:
+        """The authoritative Party round length comes from the Party timer
+        setting, not from the preset's Friendly deadline."""
+        _, match = _party_with(self.host, self.p2, self.p3)
+        commit_party_secret(
+            guest=self.host,
+            match_id=match.id,
+            command_id=uuid.uuid4(),
+            secret="72941",
+            now=timezone.now(),
+        )
+        match.refresh_from_db()
+        round_seconds = int((match.deadline - match.started_at).total_seconds())
+        self.assertEqual(round_seconds, 45)
+        self.assertLess(round_seconds, match.rules["match_deadline_seconds"])
+
+    def test_party_rematch_requires_minimum_room_members(self) -> None:
+        """A Party Room that dropped below the Party minimum cannot rematch into
+        a Match the lobby would have refused to start."""
+        room, match = _party_with(self.host, self.p2, self.p3, rounds_count=1)
+        now = timezone.now()
+        commit_party_secret(
+            guest=self.host,
+            match_id=match.id,
+            command_id=uuid.uuid4(),
+            secret="72941",
+            now=now,
+        )
+        submit_party_guess(
+            guest=self.p2, match_id=match.id, command_id=uuid.uuid4(), guess="72941", now=now
+        )
+        submit_party_guess(
+            guest=self.p3, match_id=match.id, command_id=uuid.uuid4(), guess="72941", now=now
+        )
+        advance_party_round(guest=self.host, match_id=match.id, command_id=uuid.uuid4())
+        match.refresh_from_db()
+        self.assertEqual(match.round_state, "match_finished")
+
+        RoomMembership.objects.filter(room=room, guest=self.p3).delete()
+
+        from apps.matches.rematches import rematch_command
+
+        rematch_command(
+            guest=self.host, match_id=match.id, command_id=uuid.uuid4(), action="request"
+        )
+        with self.assertRaises(GameAPIError) as ctx:
+            rematch_command(
+                guest=self.p2, match_id=match.id, command_id=uuid.uuid4(), action="request"
+            )
+        self.assertEqual(ctx.exception.default_code, "not_ready")
+        proposal = RematchProposal.objects.get(source_match=match)
+        self.assertIsNone(proposal.new_match)
+        self.assertEqual(proposal.state, RematchProposal.State.PENDING)

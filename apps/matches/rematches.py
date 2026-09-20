@@ -9,9 +9,9 @@ from apps.accounts.models import GuestIdentity
 from apps.analytics.service import record_analytics
 from apps.matches.errors import GameAPIError
 from apps.matches.features import require_match_creation
+from apps.matches.idempotency import check_command_prior, fingerprint
 from apps.matches.models import CommandRecord, Match, RematchProposal, Room, RoomMembership
 from apps.matches.rooms import _create_friendly_match
-from apps.matches.services import check_command_prior, fingerprint
 from apps.realtime.publisher import record_room_event
 
 
@@ -139,15 +139,16 @@ def rematch_command(
     elif proposal.state == RematchProposal.State.PENDING and proposal.requester_id != guest.id:
         require_match_creation()
         members = list(room.memberships.select_for_update())
-        # Option A: Extend rematch to support 2-8 players
-        # Duel requires exactly 2, Party supports 2-8 (task says 3-8, ADR says 2-8)
-        if room.room_mode == "duel":
-            if len(members) != 2:
-                raise GameAPIError("room_full", "Exactly two room members are required.")
-        else:
-            # Party mode: allow 2-8 players (task acceptance requires 3-8)
-            if len(members) < 2 or len(members) > 8:
-                raise GameAPIError("room_full", "Party rematch requires 2-8 room members.")
+        # A rematch must satisfy the same room-mode capacity policy as the
+        # original start command, otherwise it could create a Party match that
+        # the lobby would have refused to start.
+        minimum_players = Room.minimum_members(room.room_mode)
+        maximum_players = Room.maximum_members(room.room_mode)
+        if not minimum_players <= len(members) <= maximum_players:
+            raise GameAPIError(
+                "not_ready",
+                f"A rematch needs {minimum_players} to {maximum_players} room members.",
+            )
         new_match = _create_friendly_match(room=room, members=members)
         proposal.state = RematchProposal.State.ACCEPTED
         proposal.new_match = new_match

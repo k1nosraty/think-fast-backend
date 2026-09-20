@@ -11,7 +11,7 @@ plan. Cross-team implementation starts only after the shared contract is frozen.
 | T0–T7 | Foundation through Challenge | **Implemented · Unit-tested** — see the bounded task records and their evidence |
 | T8 | Production beta | **Implemented · Unit-tested** — single-host baseline passes; staging and production approval remain pending |
 | T9 | Competitive product | **Ready for planning** — split Ranked/matchmaking/progression into bounded tasks before implementation |
-| T10 | Party Mode Core Gameplay Redesign | **Implemented · Unit-tested · E2E-verified** — 1 Creator → Multiple Guessers (2–8), 60s timer, placement scoring, rotation and rematch |
+| T10 | Party Mode Core Gameplay Redesign | **Implemented · Unit-tested · E2E-verified** — 1 Creator → Multiple Guessers (3–8), 60s timer, placement scoring, rotation and rematch |
 
 ## Release boundaries
 
@@ -63,5 +63,6 @@ A task closes only when:
 - unresolved limitations are recorded rather than hidden.
 
 The cross-repository status source is the workspace [`TASKS.md`](../TASKS.md).
-After TF-05, the next task is TF-06 (cross-repository CI); no Backend roadmap
-entry is `Staging-verified` or `Production-approved` yet.
+After TF-06 (cross-repository CI), the next task is TF-07 (structured user
+playtest), with TF-08 (staging/release gate) after it; no Backend roadmap entry
+is `Staging-verified` or `Production-approved` yet.

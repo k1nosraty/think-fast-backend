@@ -1,4 +1,5 @@
 import uuid
+from typing import ClassVar
 
 from django.db import models
 
@@ -16,6 +17,20 @@ class Room(models.Model):
         ACTIVE = "active"
         CLOSED = "closed"
 
+    class Mode(models.TextChoices):
+        DUEL = "duel"
+        PARTY = "party"
+
+    # Single source of truth for room-mode membership capacity. Party needs one
+    # creator plus at least two guessers so placement scoring (1st/2nd/3rd) is
+    # meaningful, which is why its minimum is three and not two.
+    MINIMUM_MEMBERS: ClassVar[dict[str, int]] = {Mode.DUEL: 2, Mode.PARTY: 3}
+    MAXIMUM_MEMBERS: ClassVar[dict[str, int]] = {Mode.DUEL: 2, Mode.PARTY: 8}
+
+    # Default number of rounds requested when a client omits `rounds_count`.
+    # Only Party Matches use it; Duel and Solo Matches are always one round.
+    DEFAULT_ROUNDS: ClassVar[int] = 5
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     join_code = models.CharField(max_length=6, unique=True)
     host = models.ForeignKey(GuestIdentity, on_delete=models.PROTECT, related_name="hosted_rooms")
@@ -23,12 +38,22 @@ class Room(models.Model):
     challenge_source = models.CharField(
         max_length=20, choices=ChallengeSource, default=ChallengeSource.SYSTEM
     )
-    room_mode = models.CharField(max_length=20, default="party")
-    rounds_count = models.PositiveIntegerField(default=5)
+    room_mode = models.CharField(max_length=20, choices=Mode, default=Mode.DUEL)
+    rounds_count = models.PositiveIntegerField(default=DEFAULT_ROUNDS)
     state = models.CharField(max_length=20, choices=State, default=State.WAITING)
     latest_sequence = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def minimum_members(cls, room_mode: str) -> int:
+        """Ready players required before a Match may start in this mode."""
+        return cls.MINIMUM_MEMBERS.get(room_mode, cls.MINIMUM_MEMBERS[cls.Mode.PARTY])
+
+    @classmethod
+    def maximum_members(cls, room_mode: str) -> int:
+        """Membership ceiling for this mode."""
+        return cls.MAXIMUM_MEMBERS.get(room_mode, cls.MAXIMUM_MEMBERS[cls.Mode.PARTY])
 
 
 class RoomMembership(models.Model):
@@ -183,11 +208,27 @@ class Attempt(models.Model):
 
 
 class Result(models.Model):
+    class Reason(models.TextChoices):
+        """Canonical vocabulary for how a Match ended.
+
+        This is the single source of truth for ``Result.reason``. It is mirrored
+        by ``contracts/schemas/snapshot.schema.json`` and by the frontend
+        ``resultSchema``; a new value must be added here first and then to both
+        mirrors, otherwise a real Snapshot will fail contract validation.
+        """
+
+        SOLVED = "solved"
+        DEADLINE = "deadline"
+        ATTEMPT_LIMIT = "attempt_limit"
+        ABANDONED = "abandoned"
+        NOT_ENOUGH_PLAYERS = "not_enough_players"
+        VOIDED = "voided"
+
     match = models.OneToOneField(
         Match, on_delete=models.CASCADE, primary_key=True, related_name="result"
     )
     outcome = models.CharField(max_length=20)
-    reason = models.CharField(max_length=20)
+    reason = models.CharField(max_length=20, choices=Reason)
     winner_participant_ids = models.JSONField(default=list)
     secret_revealed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
