@@ -65,6 +65,7 @@ def _initial_event_ids(match_id: uuid.UUID) -> list[str]:
                 "challenge.setup_cancelled",
                 "match.countdown_started",
                 "match.started",
+                "round.started",
             ],
         ).values_list("id", flat=True)
     ]

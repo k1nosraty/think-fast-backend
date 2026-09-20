@@ -175,7 +175,8 @@ class Attempt(models.Model):
                 fields=["participant", "command_id"], name="unique_participant_command"
             ),
             models.UniqueConstraint(
-                fields=["participant", "ordinal"], name="unique_participant_ordinal"
+                fields=["participant", "round_number", "ordinal"],
+                name="unique_participant_round_ordinal",
             ),
         ]
         ordering = ["ordinal"]

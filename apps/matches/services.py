@@ -24,6 +24,11 @@ from apps.matches.models import (
     Room,
     RoomMembership,
 )
+from apps.matches.party import (
+    abandon_party_participant,
+    finish_party_round,
+    is_party_match,
+)
 from apps.realtime.publisher import record_event
 
 __all__ = [
@@ -250,6 +255,20 @@ def _activate_countdown(match: Match, now: datetime) -> None:
     if match.state != Match.State.COUNTDOWN or now < match.started_at:
         return
     match.state = Match.State.ACTIVE
+    if is_party_match(match):
+        match.round_state = "active"
+        match.save(update_fields=["state", "round_state"])
+        record_event(
+            match=match,
+            event_type="round.started",
+            visibility="match",
+            payload={
+                "round_number": match.round_number,
+                "started_at": match.started_at.isoformat().replace("+00:00", "Z"),
+                "deadline": match.deadline.isoformat().replace("+00:00", "Z"),
+            },
+        )
+        return
     match.save(update_fields=["state"])
     record_event(
         match=match,
@@ -474,15 +493,21 @@ def refresh_match_state(
             return match
     _activate_countdown(match, now)
     rules = rules_from_snapshot(match.rules)
+    is_party = is_party_match(match)
     if match.state in {Match.State.ACTIVE, Match.State.FINISHING} and now >= match.deadline:
-        if rules.match_mode == "friendly":
+        if is_party:
+            finish_party_round(match, reason="deadline", now=now)
+        elif rules.match_mode == "friendly":
             _finish_friendly(match, reason="deadline", now=now)
         else:
             participant.solve_state = Participant.SolveState.UNSOLVED
             participant.save(update_fields=["solve_state"])
             _finish(match, participant, outcome="unsolved", reason="deadline", now=now, reveal=True)
     elif match.state == Match.State.FINISHING and match.finish_due_at and now > match.finish_due_at:
-        _finish_friendly(match, reason="solved", now=now)
+        if is_party:
+            finish_party_round(match, reason="deadline", now=now)
+        else:
+            _finish_friendly(match, reason="solved", now=now)
     return match
 
 
@@ -514,11 +539,16 @@ def abandon(
             )
         return match
     if match.state == Match.State.SETUP:
-        from apps.matches.challenges import _cancel_setup_locked
+        if is_party_match(match):
+            abandon_party_participant(match, participant, now=now)
+        else:
+            from apps.matches.challenges import _cancel_setup_locked
 
-        _cancel_setup_locked(match, now=now, reason="participant_left")
+            _cancel_setup_locked(match, now=now, reason="participant_left")
     elif match.state in {Match.State.COUNTDOWN, Match.State.ACTIVE, Match.State.FINISHING}:
-        if match.rules.get("match_mode") == "friendly":
+        if is_party_match(match):
+            abandon_party_participant(match, participant, now=now)
+        elif match.rules.get("match_mode") == "friendly":
             finalize_friendly_abandon(match, participant, now=now)
         else:
             participant.solve_state = Participant.SolveState.ABANDONED

@@ -75,7 +75,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 result["secret_revealed"] = False
     actions = []
     if match.state == Match.State.ACTIVE:
-        if not is_party or not participant.is_creator:
+        if not is_party or (match.round_state == "active" and not participant.is_creator):
             actions.append("submit_guess")
         actions.append("leave")
     elif match.state == Match.State.SETUP:

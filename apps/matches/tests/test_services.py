@@ -152,7 +152,9 @@ def test_duel_finishes_immediately_when_first_player_solves() -> None:
     assert snapshot(match, host)["finished_at"] is not None
     winner_id = str(match.participants.get(guest=host).id)
     winner_snapshot = next(
-        item for item in snapshot(match, host)["participants"] if item["participant_id"] == winner_id
+        item
+        for item in snapshot(match, host)["participants"]
+        if item["participant_id"] == winner_id
     )
     assert winner_snapshot["solve_duration_seconds"] == 1
 

@@ -409,9 +409,7 @@ def start_room(
     members = list(room.memberships.select_for_update())
     minimum_players = 2 if room.room_mode == "duel" else 3
     if len(members) < minimum_players or not all(member.ready for member in members):
-        raise GameAPIError(
-            "not_ready", f"At least {minimum_players} ready players are required."
-        )
+        raise GameAPIError("not_ready", f"At least {minimum_players} ready players are required.")
     if room.room_mode == "duel" and len(members) != 2:
         raise GameAPIError("not_ready", "Exactly two ready players are required for Duel mode.")
     if room.state != Room.State.READY_CHECK:
