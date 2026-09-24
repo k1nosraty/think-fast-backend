@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts"
 # Keep in sync with apps/__init__.py CONTRACT_VERSION
 CONTRACT_VERSION = "v1.0.0-draft.1"
-CONTRACT_REVISION = "v1.0.0-draft.1-r4"
+CONTRACT_REVISION = "v1.0.0-draft.1-r5"
 CANONICAL_REPOSITORY = "think-fast-backend"
 
 

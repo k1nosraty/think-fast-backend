@@ -2,9 +2,9 @@
   "contract_version": "v1.0.0-draft.1",
   "source": {
     "repository": "think-fast-backend",
-    "revision": "v1.0.0-draft.1-r4"
+    "revision": "v1.0.0-draft.1-r5"
   },
-  "bundle_sha256": "3994d42fe13a10f6ed2af9422cec6291563d366be24b2556ef52616f568ee2d3",
+  "bundle_sha256": "b41023b0b8590829c62ae2129b8c0d65863c55b942157853b64be9d5778ac2fe",
   "openapi": "openapi.json",
   "fixtures": [
     {

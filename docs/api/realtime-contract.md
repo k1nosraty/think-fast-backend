@@ -4,7 +4,7 @@ This document explains protocol principles, resources, events, errors, and
 recovery. T0 is complete: the canonical machine-readable source is
 `contracts/openapi.json`, its JSON Schemas, manifest, and fixtures at
 `v1.0.0-draft.1`. The current compatible bundle revision is
-`v1.0.0-draft.1-r4`; `contracts/manifest.json` records that revision, every
+`v1.0.0-draft.1-r5`; `contracts/manifest.json` records that revision, every
 canonical fixture, and the deterministic SHA-256 of all other JSON artifacts.
 
 ## Global rules
@@ -57,9 +57,10 @@ edited by hand.
 
 ## Party contract
 
-`POST /rooms/` accepts `room_mode: party` and `rounds_count` from 1 through 15;
-omitting them preserves the `duel` and 5-round defaults. A Duel room holds
-exactly two members. A Party room holds three to eight members: one Creator plus
+`POST /rooms/` accepts `room_mode: party` with `rounds_count` restricted to
+3, 5 or 7 (any other Party value is a 400); omitting them preserves the `duel`
+and 5-round defaults. Duel ignores `rounds_count` and always plays one round.
+A Duel room holds exactly two members. A Party room holds three to eight members: one Creator plus
 at least two Guessers, which is the minimum for placement scoring (1st/2nd/3rd)
 to be meaningful. `Room.minimum_members()`/`Room.maximum_members()` are the
 authoritative capacity policy; the start, join and rematch paths all read it

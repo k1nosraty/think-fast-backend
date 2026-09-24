@@ -254,6 +254,38 @@ def test_production_countdown_activates_idempotently() -> None:
 
 
 @pytest.mark.django_db
+def test_party_round_count_is_enforced_at_the_api_boundary() -> None:
+    """A Party Room accepts only the documented 3/5/7 round choices.
+
+    The product rule used to live only in the UI; a direct API call with
+    `rounds_count=1` created a one-round Party Match. Duel ignores the field
+    (always a single round), so any value in 1-15 still succeeds there.
+    """
+    host, _ = guest("Host", "avatar_01")
+    rejected = host.post(
+        "/api/v1/rooms/",
+        command(preset_id="number_classic_5_v1", room_mode="party", rounds_count=1),
+        format="json",
+    )
+    assert rejected.status_code == 400
+    for rounds in (3, 5, 7):
+        accepted = host.post(
+            "/api/v1/rooms/",
+            command(preset_id="number_classic_5_v1", room_mode="party", rounds_count=rounds),
+            format="json",
+        )
+        assert accepted.status_code == 201
+        assert accepted.data["rounds_count"] == rounds
+        assert accepted.data["allowed_rounds_count"] == [3, 5, 7]
+    duel = host.post(
+        "/api/v1/rooms/",
+        command(preset_id="number_classic_5_v1", room_mode="duel", rounds_count=15),
+        format="json",
+    )
+    assert duel.status_code == 201
+
+
+@pytest.mark.django_db
 def test_gated_word_preset_cannot_create_or_retarget_a_room() -> None:
     """The gated Word preset is refused for both creation and rules updates.
 

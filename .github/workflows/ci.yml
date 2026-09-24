@@ -11,25 +11,18 @@ concurrency:
   group: backend-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# NOTE: cross-repository contract drift is enforced by frontend-ci (`check`
+# job), which compares the Frontend pin byte-for-byte against the canonical
+# Backend bundle. It is deliberately NOT duplicated here: the Frontend
+# repository is private, so this workflow's GITHUB_TOKEN cannot check it out
+# (that step failed on every run since the job was introduced). The Backend
+# side of the invariant — a self-consistent, fixture-validated bundle — is
+# covered by `validate_contracts.py` inside the quality job below.
+# Optional hardening: create a fine-grained PAT with read access to the
+# Frontend repo, store it as the `FRONTEND_READ_TOKEN` Actions secret, and
+# re-add a `diff -qr backend/contracts frontend/contracts` job using
+# `token: ${{ secrets.FRONTEND_READ_TOKEN }}` on the Frontend checkout step.
 jobs:
-  contract-drift:
-    name: Backend/Frontend contract drift
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout Backend
-        uses: actions/checkout@v4
-        with:
-          path: backend
-      - name: Checkout pinned Frontend bundle
-        uses: actions/checkout@v4
-        with:
-          repository: miladmoham1400/think-fast-frontend
-          ref: develop
-          path: frontend
-      - name: Compare canonical contract artifacts
-        run: diff -qr backend/contracts frontend/contracts
-
   quality:
     name: Backend quality and contracts
     runs-on: ubuntu-latest
