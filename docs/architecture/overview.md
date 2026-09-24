@@ -61,6 +61,27 @@ state.
 - Persist events in an outbox when reliable post-commit fan-out is required.
 - A reconnecting client requests a snapshot plus the latest sequence number.
 
+## Read/write path performance
+
+Hot-path rules, enforced by the implementation and its tests:
+
+- Snapshot polling never takes row locks unless a time-based transition
+  (setup expiry, countdown, deadline, finish) is actually due; the locked
+  refresh re-validates every condition.
+- Sequence allocation bumps `latest_sequence` with an atomic `F()` update and
+  reads the value back — no nested `SELECT FOR UPDATE` and no savepoint per
+  event inside the caller's transaction.
+- Per-participant `save()` loops are banned on fan-out writes; Party scoring,
+  round advance and friendly finish use `bulk_update`.
+- The Party/Duel dispatcher routes on one indexed `room_mode` column read; row
+  materialization belongs to the handler that owns the lock.
+- The match consumer replays connect-time setup events with one batched fetch.
+- The outbox scan targets partial `published_at IS NULL` indexes on
+  `MatchEvent`/`RoomEvent` (migration `0014`).
+
+Measure database contention, event fan-out, and Redis memory before extracting
+anything.
+
 ## Security and privacy
 
 - Secrets are sensitive gameplay data, even if not personal data.

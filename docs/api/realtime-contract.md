@@ -4,7 +4,7 @@ This document explains protocol principles, resources, events, errors, and
 recovery. T0 is complete: the canonical machine-readable source is
 `contracts/openapi.json`, its JSON Schemas, manifest, and fixtures at
 `v1.0.0-draft.1`. The current compatible bundle revision is
-`v1.0.0-draft.1-r3`; `contracts/manifest.json` records that revision, every
+`v1.0.0-draft.1-r4`; `contracts/manifest.json` records that revision, every
 canonical fixture, and the deterministic SHA-256 of all other JSON artifacts.
 
 ## Global rules
@@ -63,7 +63,10 @@ exactly two members. A Party room holds three to eight members: one Creator plus
 at least two Guessers, which is the minimum for placement scoring (1st/2nd/3rd)
 to be meaningful. `Room.minimum_members()`/`Room.maximum_members()` are the
 authoritative capacity policy; the start, join and rematch paths all read it
-rather than re-deriving the numbers. Room snapshots expose both fields.
+rather than re-deriving the numbers. Room snapshots expose `minimum_members`,
+`maximum_members` and `allowed_rounds_count` (`Room.allowed_rounds()`:
+`[1]` for Duel, `[3, 5, 7]` for Party), so clients derive the lobby gate and
+the offered round choices from the server instead of mirroring constants.
 
 A Party match snapshot uses the common Snapshot schema plus `round_number`,
 `total_rounds`, `creator_participant_id`, per-participant `score`, `round_score`,

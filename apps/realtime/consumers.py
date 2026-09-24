@@ -199,8 +199,9 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
         replaced_channel = await _claim(self.participant_id, self.connection_id, self.channel_name)
         if replaced_channel and replaced_channel != self.channel_name:
             await self.channel_layer.send(replaced_channel, {"type": "force.disconnect"})
-        for event_id in await _initial_event_ids(self.match_id):
-            await self.match_event({"event_id": event_id})
+        # One batched fetch instead of one query per setup event.
+        for stored in await _events_by_ids(await _initial_event_ids(self.match_id)):
+            await self._send_stored_event(stored)
         self.countdown_task = asyncio.create_task(self._activate_when_due())
 
     async def _activate_when_due(self) -> None:
@@ -327,6 +328,9 @@ class MatchConsumer(AsyncJsonWebsocketConsumer):
 
     async def match_event(self, event: dict[str, str]) -> None:
         stored = await _event(event["event_id"])
+        await self._send_stored_event(stored)
+
+    async def _send_stored_event(self, stored: MatchEvent) -> None:
         if stored.visibility == "participant" and stored.participant_id != self.participant_id:
             return
         if stored.event_type == "opponent.guessed" and stored.participant_id == self.participant_id:

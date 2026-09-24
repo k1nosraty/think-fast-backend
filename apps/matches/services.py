@@ -471,11 +471,49 @@ def submit_guess(
     return attempt, match, created
 
 
-@transaction.atomic
 def refresh_match_state(
     *, guest: GuestIdentity, match_id: uuid.UUID, now: datetime | None = None
 ) -> Match:
+    """Return the match, applying time-based transitions only when one can be due.
+
+    Snapshot polling is the highest-frequency read in the system and used to
+    take row locks on every call, serializing recovery polls behind concurrent
+    guesses. The fast path below reads without locks; the locked transition
+    runs only when a deadline/countdown/finish timestamp has actually passed.
+    The locked body re-validates every condition, so a stale fast-path read can
+    at worst cause one redundant lock acquisition, never a missed transition.
+    """
     now = now or timezone.now()
+    match = Match.objects.select_related("room").filter(pk=match_id).first()
+    if match is None:
+        raise GameAPIError("match_not_found", "Match was not found.", status_code=404)
+    if not Participant.objects.filter(match_id=match_id, guest=guest).exists():
+        raise GameAPIError(
+            "permission_denied", "You are not a participant in this match.", status_code=403
+        )
+    setup_due = (
+        match.state == Match.State.SETUP
+        and match.setup_expires_at is not None
+        and now >= match.setup_expires_at
+    )
+    countdown_due = match.state == Match.State.COUNTDOWN and now >= match.started_at
+    deadline_due = match.state in {Match.State.ACTIVE, Match.State.FINISHING} and (
+        match.deadline is not None and now >= match.deadline
+    )
+    finishing_due = (
+        match.state == Match.State.FINISHING
+        and match.finish_due_at is not None
+        and now > match.finish_due_at
+    )
+    if not (setup_due or countdown_due or deadline_due or finishing_due):
+        return match
+    return _refresh_match_state_locked(guest=guest, match_id=match_id, now=now)
+
+
+@transaction.atomic
+def _refresh_match_state_locked(
+    *, guest: GuestIdentity, match_id: uuid.UUID, now: datetime
+) -> Match:
     match = Match.objects.select_for_update().filter(pk=match_id).first()
     if match is None:
         raise GameAPIError("match_not_found", "Match was not found.", status_code=404)
@@ -591,6 +629,19 @@ def abandon(
     return match
 
 
+def _party_room_mode(match_id: uuid.UUID) -> str | None:
+    """Room mode for routing, as a single indexed column read.
+
+    The dispatcher used to hydrate a full Match + Room row only to decide
+    Party vs Solo/Duel, then the chosen handler re-read the same rows under
+    lock. A one-column lookup keeps the routing decision while leaving row
+    materialization to the handler that owns the lock. Missing/roomless
+    matches return None and fall through to the Solo/Duel handler, which
+    raises the authoritative error.
+    """
+    return Room.objects.filter(matches__id=match_id).values_list("room_mode", flat=True).first()
+
+
 def submit_any_guess(
     *,
     guest: GuestIdentity,
@@ -600,8 +651,7 @@ def submit_any_guess(
     now: datetime | None = None,
 ) -> tuple[Attempt, Match, bool]:
     """Unified guess submission dispatching to party or solo/duel mode."""
-    match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
-    if match_obj is not None and is_party_match(match_obj):
+    if _party_room_mode(match_id) == Room.Mode.PARTY:
         from apps.matches.party import submit_party_guess
 
         return submit_party_guess(
@@ -619,8 +669,7 @@ def commit_any_challenge(
     now: datetime | None = None,
 ) -> tuple[Match, bool]:
     """Unified challenge commit dispatching to party or player-authored challenge."""
-    match_obj = Match.objects.select_related("room").filter(pk=match_id).first()
-    if match_obj is not None and is_party_match(match_obj):
+    if _party_room_mode(match_id) == Room.Mode.PARTY:
         from apps.matches.party import commit_party_secret
 
         return commit_party_secret(

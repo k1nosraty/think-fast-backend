@@ -315,6 +315,16 @@ class MatchEvent(models.Model):
                 fields=["match", "sequence"], name="unique_match_event_sequence"
             )
         ]
+        # The reliability worker scans for unpublished events every second on an
+        # append-only table. A partial index keeps that scan off the full table
+        # without taxing the hot write path (inserts only, rare updates).
+        indexes = [
+            models.Index(
+                fields=["next_attempt_at"],
+                name="matchevent_outbox_due_idx",
+                condition=models.Q(published_at__isnull=True),
+            )
+        ]
         ordering = ["sequence"]
 
 
@@ -333,5 +343,12 @@ class RoomEvent(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["room", "sequence"], name="unique_room_event_sequence")
+        ]
+        indexes = [
+            models.Index(
+                fields=["next_attempt_at"],
+                name="roomevent_outbox_due_idx",
+                condition=models.Q(published_at__isnull=True),
+            )
         ]
         ordering = ["sequence"]
