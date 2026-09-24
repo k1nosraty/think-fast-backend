@@ -420,6 +420,29 @@ def test_room_snapshot_viewer_participant_id_is_null_for_non_member() -> None:
 
 
 @pytest.mark.django_db
+def test_room_snapshot_publishes_capacity_and_round_policy() -> None:
+    host = _guest("Host")
+    duel_room, _ = create_room(guest=host, command_id=_command(), preset_id="number_classic_5_v1")
+    duel_snap = room_snapshot(Room.objects.get(pk=duel_room.id), guest=host)
+    assert duel_snap["minimum_members"] == Room.minimum_members(Room.Mode.DUEL) == 2
+    assert duel_snap["maximum_members"] == Room.maximum_members(Room.Mode.DUEL) == 2
+    assert duel_snap["allowed_rounds_count"] == Room.allowed_rounds(Room.Mode.DUEL) == [1]
+
+    party_host = _guest("PartyHost")
+    party_room, _ = create_room(
+        guest=party_host,
+        command_id=_command(),
+        preset_id="number_classic_5_v1",
+        room_mode="party",
+        rounds_count=3,
+    )
+    party_snap = room_snapshot(Room.objects.get(pk=party_room.id), guest=party_host)
+    assert party_snap["minimum_members"] == 3
+    assert party_snap["maximum_members"] == 8
+    assert party_snap["allowed_rounds_count"] == [3, 5, 7]
+
+
+@pytest.mark.django_db
 def test_room_for_join_code_returns_active_room_only() -> None:
     room, _ = create_room(guest=_guest(), command_id=_command(), preset_id="number_classic_5_v1")
     assert room_for_join_code(room.join_code) is not None

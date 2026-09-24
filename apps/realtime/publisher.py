@@ -5,7 +5,7 @@ from datetime import timedelta
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from apps.matches.models import Match, MatchEvent, Participant, Room, RoomEvent
@@ -78,7 +78,31 @@ def publish_room_event(event_id: uuid.UUID) -> bool:
     return True
 
 
-@transaction.atomic
+def _bump_match_sequence(match: Match) -> int:
+    """Atomic increment without a second SELECT FOR UPDATE.
+
+    Callers on the hot path (guess/commit) already hold the Match row via
+    ``select_for_update`` in the outer transaction. A nested
+    ``select_for_update`` + save only adds a savepoint and a second lock
+    acquisition for the same row. An ``F()`` update is atomic at the DB level
+    (no lost update when called without the outer lock) and the fresh value
+    is read back so concurrent writers never reuse the same sequence.
+    """
+    Match.objects.filter(pk=match.pk).update(latest_sequence=F("latest_sequence") + 1)
+    seq = Match.objects.filter(pk=match.pk).values_list("latest_sequence", flat=True).first()
+    assert seq is not None
+    match.latest_sequence = seq
+    return seq
+
+
+def _bump_room_sequence(room: Room) -> int:
+    Room.objects.filter(pk=room.pk).update(latest_sequence=F("latest_sequence") + 1)
+    seq = Room.objects.filter(pk=room.pk).values_list("latest_sequence", flat=True).first()
+    assert seq is not None
+    room.latest_sequence = seq
+    return seq
+
+
 def record_event(
     *,
     match: Match,
@@ -87,38 +111,45 @@ def record_event(
     payload: dict[str, object],
     participant: Participant | None = None,
 ) -> MatchEvent:
-    locked_match = Match.objects.select_for_update().get(pk=match.pk)
-    locked_match.latest_sequence += 1
-    locked_match.save(update_fields=["latest_sequence"])
-    match.latest_sequence = locked_match.latest_sequence
-    event = MatchEvent.objects.create(
-        match=locked_match,
-        sequence=locked_match.latest_sequence,
-        event_type=event_type,
-        visibility=visibility,
-        participant=participant,
-        payload=payload,
-        occurred_at=timezone.now(),
-    )
-    transaction.on_commit(lambda: publish_match_event(event.id))
-    return event
+    def _create() -> MatchEvent:
+        seq = _bump_match_sequence(match)
+        event = MatchEvent.objects.create(
+            match_id=match.pk,
+            sequence=seq,
+            event_type=event_type,
+            visibility=visibility,
+            participant=participant,
+            payload=payload,
+            occurred_at=timezone.now(),
+        )
+        transaction.on_commit(lambda: publish_match_event(event.id))
+        return event
+
+    # Avoid a savepoint per event when already inside the caller's transaction
+    # (the common guess/commit path emits 1-2 events per write).
+    if transaction.get_connection().in_atomic_block:
+        return _create()
+    with transaction.atomic():
+        return _create()
 
 
-@transaction.atomic
 def record_room_event(*, room: Room, event_type: str, payload: dict[str, object]) -> RoomEvent:
-    locked_room = Room.objects.select_for_update().get(pk=room.pk)
-    locked_room.latest_sequence += 1
-    locked_room.save(update_fields=["latest_sequence"])
-    room.latest_sequence = locked_room.latest_sequence
-    event = RoomEvent.objects.create(
-        room=locked_room,
-        sequence=locked_room.latest_sequence,
-        event_type=event_type,
-        payload=payload,
-        occurred_at=timezone.now(),
-    )
-    transaction.on_commit(lambda: publish_room_event(event.id))
-    return event
+    def _create() -> RoomEvent:
+        seq = _bump_room_sequence(room)
+        event = RoomEvent.objects.create(
+            room_id=room.pk,
+            sequence=seq,
+            event_type=event_type,
+            payload=payload,
+            occurred_at=timezone.now(),
+        )
+        transaction.on_commit(lambda: publish_room_event(event.id))
+        return event
+
+    if transaction.get_connection().in_atomic_block:
+        return _create()
+    with transaction.atomic():
+        return _create()
 
 
 def publish_pending(*, limit: int = 100) -> tuple[int, int]:

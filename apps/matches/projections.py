@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.db.models import Prefetch
 from django.utils import timezone
 
 from apps import CONTRACT_VERSION
@@ -7,7 +8,7 @@ from apps.accounts.models import GuestIdentity
 from apps.games.registry import adapter_for, rules_from_snapshot
 from apps.games.secrets import decrypt_secret
 from apps.matches.errors import GameAPIError
-from apps.matches.models import Challenge, Match, Participant
+from apps.matches.models import Attempt, Challenge, Match, Participant, Result
 from apps.matches.party import is_party_match
 
 
@@ -16,21 +17,35 @@ def iso(value: datetime | None) -> str | None:
 
 
 def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
+    match_id = match.pk
     participant = (
-        Participant.objects.prefetch_related("attempts").filter(match=match, guest=guest).first()
+        Participant.objects.select_related("match")
+        .prefetch_related(Prefetch("attempts", queryset=Attempt.objects.order_by("ordinal")))
+        .filter(match_id=match_id, guest=guest)
+        .first()
     )
     if participant is None:
         raise GameAPIError(
             "permission_denied", "You are not a participant in this match.", status_code=403
         )
-    match.refresh_from_db()
+    # One fresh read with room/creator joined instead of refresh + lazy joins.
+    # Callers pass a possibly-stale instance after a write transaction.
+    fresh = Match.objects.select_related("room", "creator").filter(pk=match_id).first()
+    assert fresh is not None
+    match = fresh
+    # Re-point the participant's cached match so is_party_match() and later
+    # reads do not trigger an extra query.
+    participant.match = match
     rules = rules_from_snapshot(match.rules)
     history = rules.history_policy
     is_party = is_party_match(match)
+    # The attempts are already prefetched above; filter in Python so the
+    # prefetch is actually used instead of issuing a second query.
+    prefetched_attempts = list(participant.attempts.all())
     if is_party:
-        attempt_rows = list(participant.attempts.filter(round_number=match.round_number))
+        attempt_rows = [a for a in prefetched_attempts if a.round_number == match.round_number]
     else:
-        attempt_rows = list(participant.attempts.all())
+        attempt_rows = prefetched_attempts
     if history.get("type") == "last_n":
         count = history.get("count", 1)
         attempt_rows = attempt_rows[-(count if isinstance(count, int) else 1) :]
@@ -47,26 +62,42 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
         }
         for item in attempt_rows
     ]
+    try:
+        result_obj: Result | None = match.result
+    except Result.DoesNotExist:
+        result_obj = None
+    # Single Challenge query for everything below (reveal + setup + actions).
+    # The table is tiny per match (1 shared or ≤2 duel challenges), so one
+    # fetch in Python replaces up to 6 sequential EXISTS/COUNT/FIRST queries.
+    challenges = list(Challenge.objects.filter(match_id=match.pk))
+    round_challenges = [c for c in challenges if c.round_number == match.round_number]
+    shared_round_challenge = next((c for c in round_challenges if c.solver_id is None), None)
+    own_challenge = next(
+        (c for c in challenges if c.creator_id == participant.id),
+        None,
+    )
+    own_round_challenge = next(
+        (c for c in round_challenges if c.creator_id == participant.id),
+        None,
+    )
     result = None
-    if hasattr(match, "result") and (
+    if result_obj is not None and (
         not is_party or match.round_state in {"round_finished", "match_finished"}
     ):
-        outcome = match.result.outcome
-        if outcome == "won" and str(participant.id) not in match.result.winner_participant_ids:
+        outcome = result_obj.outcome
+        if outcome == "won" and str(participant.id) not in result_obj.winner_participant_ids:
             outcome = "lost"
         result = {
             "outcome": outcome,
-            "winner_participant_ids": match.result.winner_participant_ids,
-            "reason": match.result.reason,
-            "secret_revealed": match.result.secret_revealed,
+            "winner_participant_ids": result_obj.winner_participant_ids,
+            "reason": result_obj.reason,
+            "secret_revealed": result_obj.secret_revealed,
         }
-        if match.result.secret_revealed:
+        if result_obj.secret_revealed:
             challenge = (
-                Challenge.objects.filter(
-                    match=match, round_number=match.round_number, solver__isnull=True
-                ).first()
-                or Challenge.objects.filter(match=match, solver=participant).first()
-                or Challenge.objects.filter(match=match, solver__isnull=True).first()
+                shared_round_challenge
+                or next((c for c in challenges if c.solver_id == participant.id), None)
+                or next((c for c in challenges if c.solver_id is None), None)
             )
             if challenge is not None and challenge.secret_destroyed_at is None:
                 result["revealed_secret"] = adapter_for(rules.game_type).decode_secret(
@@ -86,8 +117,7 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
             else:
                 actions.append("leave")
         else:
-            own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
-            actions = ["leave"] if own_commit else ["commit_challenge", "leave"]
+            actions = ["leave"] if own_challenge is not None else ["commit_challenge", "leave"]
     elif match.round_state == "round_finished":
         if is_party and match.round_number < match.total_rounds:
             actions.append("next_round")
@@ -101,16 +131,8 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
     setup = None
     if match.state == Match.State.SETUP:
         if is_party:
-            own_commit = Challenge.objects.filter(
-                match=match, round_number=match.round_number, creator=participant
-            ).exists()
-            committed_count = (
-                1
-                if Challenge.objects.filter(
-                    match=match, round_number=match.round_number, committed_at__isnull=False
-                ).exists()
-                else 0
-            )
+            own_commit = own_round_challenge is not None
+            committed_count = 1 if any(c.committed_at is not None for c in round_challenges) else 0
             setup = {
                 "expires_at": iso(match.setup_expires_at),
                 "own_challenge_committed": own_commit,
@@ -120,20 +142,17 @@ def snapshot(match: Match, guest: GuestIdentity) -> dict[str, object]:
                 "creator_participant_id": str(match.creator_id) if match.creator_id else None,
             }
         else:
-            own_commit = Challenge.objects.filter(match=match, creator=participant).exists()
-            committed_count = Challenge.objects.filter(
-                match=match, committed_at__isnull=False
-            ).count()
+            committed_count = sum(1 for c in challenges if c.committed_at is not None)
             setup = {
                 "expires_at": iso(match.setup_expires_at),
-                "own_challenge_committed": own_commit,
+                "own_challenge_committed": own_challenge is not None,
                 "committed_count": committed_count,
                 "required_count": 2,
             }
     participants = list(match.participants.all())
-    if result is not None and match.result.winner_participant_ids:
+    if result is not None and result_obj is not None and result_obj.winner_participant_ids:
         winner = next(
-            (item for item in participants if str(item.id) in match.result.winner_participant_ids),
+            (item for item in participants if str(item.id) in result_obj.winner_participant_ids),
             None,
         )
         result["winner_solve_duration_seconds"] = (

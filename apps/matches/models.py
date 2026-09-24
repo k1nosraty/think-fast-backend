@@ -31,6 +31,14 @@ class Room(models.Model):
     # Only Party Matches use it; Duel and Solo Matches are always one round.
     DEFAULT_ROUNDS: ClassVar[int] = 5
 
+    # Authoritative per-mode round choices. Party offers 3/5/7 (product rule);
+    # Duel/Solo are single-round. Published in the Room contract so clients stop
+    # mirroring it (FT-01).
+    ALLOWED_ROUNDS: ClassVar[dict[str, list[int]]] = {
+        Mode.DUEL: [1],
+        Mode.PARTY: [3, 5, 7],
+    }
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     join_code = models.CharField(max_length=6, unique=True)
     host = models.ForeignKey(GuestIdentity, on_delete=models.PROTECT, related_name="hosted_rooms")
@@ -54,6 +62,11 @@ class Room(models.Model):
     def maximum_members(cls, room_mode: str) -> int:
         """Membership ceiling for this mode."""
         return cls.MAXIMUM_MEMBERS.get(room_mode, cls.MAXIMUM_MEMBERS[cls.Mode.PARTY])
+
+    @classmethod
+    def allowed_rounds(cls, room_mode: str) -> list[int]:
+        """Round-count choices the client may offer for this mode."""
+        return list(cls.ALLOWED_ROUNDS.get(room_mode, cls.ALLOWED_ROUNDS[cls.Mode.PARTY]))
 
 
 class RoomMembership(models.Model):

@@ -230,18 +230,23 @@ def commit_party_secret(
 
 def calculate_and_apply_scores(match: Match, reason: str, now: datetime) -> dict[str, Any]:
     rules = rules_from_snapshot(match.rules)
-    solvers = list(
-        match.participants.filter(solve_state=Participant.SolveState.SOLVED).order_by(
-            "solved_at", "attempt_count"
-        )
+    # Single fetch: partition in Python instead of 4 filtered queries.
+    all_participants = list(match.participants.all())
+    creator_id = match.creator_id
+    creator = match.creator if creator_id is not None else None
+    # If creator was not prefetched via select_related, resolve from the batch.
+    if creator is None and creator_id is not None:
+        creator = next((p for p in all_participants if p.id == creator_id), None)
+    solvers = sorted(
+        [p for p in all_participants if p.solve_state == Participant.SolveState.SOLVED],
+        key=lambda p: (p.solved_at is None, p.solved_at, p.attempt_count),
     )
-    creator = match.creator
-    unsolved_qs = match.participants.filter(
-        solve_state__in=[Participant.SolveState.PLAYING, Participant.SolveState.UNSOLVED]
+    unsolved_count = sum(
+        1
+        for p in all_participants
+        if p.solve_state in (Participant.SolveState.PLAYING, Participant.SolveState.UNSOLVED)
+        and p.id != creator_id
     )
-    if creator is not None:
-        unsolved_qs = unsolved_qs.exclude(pk=creator.pk)
-    unsolved_count = unsolved_qs.count()
 
     solver_records: list[dict[str, Any]] = []
     for idx, solver in enumerate(solvers):
@@ -249,7 +254,6 @@ def calculate_and_apply_scores(match: Match, reason: str, now: datetime) -> dict
         solver.round_score = pts
         solver.score += pts
         solver.round_rank = idx + 1
-        solver.save(update_fields=["round_score", "score", "round_rank"])
         duration_ms = (
             max(0, int((solver.solved_at - match.started_at).total_seconds() * 1000))
             if solver.solved_at
@@ -283,16 +287,28 @@ def calculate_and_apply_scores(match: Match, reason: str, now: datetime) -> dict
                 creator_pts = max(CREATOR_MINIMUM_POINTS, challenge_bonus)
         creator.round_score = creator_pts
         creator.score += creator_pts
-        creator.save(update_fields=["round_score", "score"])
 
-    for non_solver in match.participants.filter(
-        solve_state__in=[Participant.SolveState.PLAYING, Participant.SolveState.UNSOLVED]
-    ):
-        if creator and non_solver.id == creator.id:
+    non_solvers: list[Participant] = []
+    for non_solver in all_participants:
+        if non_solver.solve_state not in (
+            Participant.SolveState.PLAYING,
+            Participant.SolveState.UNSOLVED,
+        ):
+            continue
+        if creator_id is not None and non_solver.id == creator_id:
             continue
         non_solver.solve_state = Participant.SolveState.UNSOLVED
         non_solver.round_score = 0
-        non_solver.save(update_fields=["solve_state", "round_score"])
+        non_solvers.append(non_solver)
+
+    # 1-2 UPDATE statements instead of N per-participant saves.
+    if solvers:
+        Participant.objects.bulk_update(solvers, ["round_score", "score", "round_rank"])
+    dirty_creator = [creator] if creator is not None else []
+    if dirty_creator:
+        Participant.objects.bulk_update(dirty_creator, ["round_score", "score"])
+    if non_solvers:
+        Participant.objects.bulk_update(non_solvers, ["solve_state", "round_score"])
 
     revealed_secret = None
     challenge = get_current_round_challenge(match)
@@ -300,7 +316,7 @@ def calculate_and_apply_scores(match: Match, reason: str, now: datetime) -> dict
         decrypted = decrypt_secret(challenge.protected_secret)
         revealed_secret = adapter_for(rules.game_type).decode_secret(rules, decrypted)
 
-    scores_map = {str(p.id): p.score for p in match.participants.all()}
+    scores_map = {str(p.id): p.score for p in all_participants}
 
     return {
         "round_number": match.round_number,
@@ -732,22 +748,25 @@ def advance_party_round(
         update_fields=["round_number", "creator", "state", "round_state", "setup_expires_at"]
     )
 
-    for p in match.participants.all():
+    reset_batch = list(match.participants.all())
+    for p in reset_batch:
         p.is_creator = p.id == next_creator.id
         p.solve_state = Participant.SolveState.PLAYING
         p.attempt_count = 0
         p.round_score = 0
         p.round_rank = None
         p.solved_at = None
-        p.save(
-            update_fields=[
+    if reset_batch:
+        Participant.objects.bulk_update(
+            reset_batch,
+            [
                 "is_creator",
                 "solve_state",
                 "attempt_count",
                 "round_score",
                 "round_rank",
                 "solved_at",
-            ]
+            ],
         )
 
     record_event(

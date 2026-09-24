@@ -73,6 +73,11 @@ def room_snapshot(room: Room, guest: GuestIdentity | None = None) -> dict[str, o
         "challenge_source": room.challenge_source,
         "room_mode": room.room_mode,
         "rounds_count": room.rounds_count,
+        # FT-01: publish the authoritative capacity + round policy so clients
+        # derive the lobby gate from the server instead of mirroring constants.
+        "minimum_members": Room.minimum_members(room.room_mode),
+        "maximum_members": Room.maximum_members(room.room_mode),
+        "allowed_rounds_count": Room.allowed_rounds(room.room_mode),
         "state": room.state,
         "latest_sequence": room.latest_sequence,
         "latest_match_id": str(latest_match.id) if latest_match else None,

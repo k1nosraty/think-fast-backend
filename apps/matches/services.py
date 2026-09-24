@@ -155,10 +155,11 @@ def _finish_friendly(match: Match, *, reason: str, now: datetime) -> None:
                 outcome = "won"
         else:
             outcome = "won"
-    for item in participants:
-        if item.solve_state == Participant.SolveState.PLAYING:
-            item.solve_state = Participant.SolveState.UNSOLVED
-            item.save(update_fields=["solve_state"])
+    dirty = [item for item in participants if item.solve_state == Participant.SolveState.PLAYING]
+    for item in dirty:
+        item.solve_state = Participant.SolveState.UNSOLVED
+    if dirty:
+        Participant.objects.bulk_update(dirty, ["solve_state"])
     match.state = Match.State.FINISHED
     match.finished_at = now
     match.finish_due_at = None
